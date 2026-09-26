@@ -1,4 +1,4 @@
-"""Batch read/write for the CSTL .cstl translation loop — agent is the engine."""
+"""Batch read/write CopasTool project lines — the agent is the translation engine."""
 from __future__ import annotations
 
 import argparse
@@ -8,43 +8,21 @@ import os
 from .cstl_io import backup_cstl, ensure_cstl, load_cstl, save_cstl
 
 
-def read_batch_with_context(cstl_path: str, size: int = 100, context: int = 0) -> dict:
-    data = ensure_cstl(load_cstl(cstl_path))
-    all_lines: list[dict] = data.get("lines", [])
-    num_to_idx = {ln["line_num"]: i for i, ln in enumerate(all_lines)}
-    batch: list[dict] = []
-    first_idx: int | None = None
-    for ln in all_lines:
-        if not ln.get("is_translated") and (ln.get("message") or "").strip():
-            if first_idx is None:
-                first_idx = num_to_idx[ln["line_num"]]
-            batch.append({
-                "line_num": ln["line_num"],
-                "file": ln.get("file", ""),
-                "name": ln.get("name"),
-                "message": ln.get("message", ""),
-                "trans_message": ln.get("trans_message"),
-            })
-            if len(batch) >= size:
-                break
-    ctx: list[dict] = []
-    if context > 0 and first_idx is not None and batch:
-        start = max(0, first_idx - context)
-        for ln in all_lines[start:first_idx]:
-            ctx.append({
-                "line_num": ln["line_num"],
-                "file": ln.get("file", ""),
-                "name": ln.get("name"),
-                "message": ln.get("message", ""),
-                "trans_message": ln.get("trans_message"),
-                "trans_name": ln.get("trans_name"),
-                "is_translated": bool(ln.get("is_translated")),
-            })
-    return {"context": ctx, "batch": batch}
-
-
 def read_batch(cstl_path: str, size: int = 100) -> list[dict]:
-    return read_batch_with_context(cstl_path, size=size, context=0)["batch"]
+    data = ensure_cstl(load_cstl(cstl_path))
+    out: list[dict] = []
+    for ln in data.get("lines", []):
+        if not ln.get("is_translated") and (ln.get("message") or "").strip():
+            out.append({
+                "line_num": ln["line_num"],
+                "file": ln.get("file", ""),
+                "name": ln.get("name"),
+                "message": ln.get("message", ""),
+                "trans_message": ln.get("trans_message"),
+            })
+            if len(out) >= size:
+                break
+    return out
 
 
 def read_translated_batch(cstl_path: str, size: int = 100) -> list[dict]:
@@ -105,13 +83,12 @@ def write_back(cstl_path: str, translations: list[dict]) -> int:
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Batch read/write for CSTL .cstl loop")
+    ap = argparse.ArgumentParser(description="Batch read/write for CopasTool project backups")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     r = sub.add_parser("read", help="Print next untranslated batch as JSON")
     r.add_argument("cstl_path")
     r.add_argument("--size", type=int, default=100)
-    r.add_argument("--context", type=int, default=0, help="Include N preceding lines as context (for subagents/continuity)")
 
     rt = sub.add_parser("read-translated", help="Print next translated batch (for polish)")
     rt.add_argument("cstl_path")
@@ -123,10 +100,8 @@ def main(argv=None):
 
     a = ap.parse_args(argv)
     if a.cmd == "read":
-        if a.context:
-            print(json.dumps(read_batch_with_context(a.cstl_path, size=a.size, context=a.context), ensure_ascii=False))
-        else:
-            print(json.dumps(read_batch(a.cstl_path, size=a.size), ensure_ascii=False))
+        batch = read_batch(a.cstl_path, size=a.size)
+        print(json.dumps(batch, ensure_ascii=False))
     elif a.cmd == "read-translated":
         batch = read_translated_batch(a.cstl_path, size=a.size)
         print(json.dumps(batch, ensure_ascii=False))

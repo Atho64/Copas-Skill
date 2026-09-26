@@ -1,4 +1,4 @@
-"""Export a .cstl bundle back to JSON / EPUB / Luca TXT on disk."""
+"""Export a CopasTool project backup back to JSON / EPUB / Luca TXT on disk."""
 from __future__ import annotations
 
 import argparse
@@ -235,7 +235,7 @@ def export_luca(cstl_path: str, out_dir: str) -> list[str]:
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Export .cstl to JSON/EPUB/Luca")
+    ap = argparse.ArgumentParser(description="Export CopasTool project backup to JSON/EPUB/Luca")
     ap.add_argument("--cstl", required=True)
     ap.add_argument("--output", required=True)
     ap.add_argument("--format", dest="fmt", choices=["json", "epub", "luca", "auto"], default="auto")

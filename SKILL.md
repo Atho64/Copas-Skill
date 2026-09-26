@@ -1,18 +1,20 @@
 ---
 name: cstl-translate
-description: Translate visual novels end-to-end on the coding agent itself (Claude Code / Codex), CSTL-style — parse JSON/EPUB/Luca TXT into .cstl, build a locked glossary, translate batch-by-batch with the agent as engine, write back and export. Triggers on "translate this VN", "terjemahkan VN ini", "translate with cstl", "cstl translate" and similar VN translation requests.
+description: Translate visual novels using CopasTool project backups (.copas, .copas.zip, legacy .cstl) or supported JSON/EPUB/Luca inputs; prepare glossaries, translate in aligned batches, and export or return the project to CopasTool. Use for requests to translate a VN with CSTL/CopasTool.
 ---
 
-# cstl-translate — Agent-as-Engine VN Translator for CSTL Format
+# cstl-translate — Agent-based VN Translation for CopasTool
 
-Let the **coding agent itself** be the translation engine, with a deterministic Python pipeline that mirrors [CSTL (Copas Tool)](https://atho64.github.io/cstl) — translate a visual novel **end-to-end on the agent**:
+Let the **coding agent itself** translate, while the Python pipeline handles import, batch alignment, write-back, and validation. The workflow is designed around current [CopasTool](https://atho64.github.io/cstl) project backups:
 
 ```
 parse → build locked glossary → translate batch-by-batch (agent) → write back → export → verify
 ```
 
 - **Agent IS the engine**: no external translation API; quality comes from the agent following `references/translation_rules.md` + your `user_prompt.md` + a locked glossary.
-- **CSTL-native**: reads and writes `.cstl` backup JSON (the single-file project format CSTL uses for Backup/Restore). Also handles raw `JSON (VNTP)`, `EPUB`, and `LucaSystem TXT` inputs.
+- **Current backup support**: reads and writes `.copas` project JSON and `.copas.zip` large-project backups (`project.json` plus `custom_sources/`). Legacy `.cstl` JSON backups remain supported.
+- **Line data compatibility**: preserves unknown project/line fields, including reference-language, EPUB, LucaSystem, and custom-parser metadata.
+- **Inputs handled by this pipeline**: VNTP JSON, ZIPs containing JSON files, EPUB, LucaSystem TXT, and CopasTool backups. For a custom-parser project, use a CopasTool backup and let CopasTool's installed parser handle round-trip export.
 - **Resumable**: `batch read` only returns `is_translated=false` lines — re-run resumes from the first untranslated line. Each `batch write` creates a timestamped backup.
 - **Any language pair**: auto-detect source, user-specified target (examples use `Japanese → Indonesian`).
 
@@ -75,22 +77,22 @@ mkdir -p "$WORK/work" "$WORK/out"
 
 ---
 
-## Step 2 — Parse input into .cstl
+## Step 2 — Parse input into a CopasTool project
 
-Turn raw files into a `.cstl` project bundle (`work/project.cstl`):
+Turn raw files into a `.copas` project (`work/project.copas`):
 
 ```bash
 # JSON (VNTP) — single file, folder, zip, or multiple files
-<PFX> -m cstl_translate.parse --input /path/to/scene.json --out "$WORK/work/project.cstl" --name "My VN"
+<PFX> -m cstl_translate.parse --input /path/to/scene.json --out "$WORK/work/project.copas" --name "My VN"
 
 # Folder of JSONs
-<PFX> -m cstl_translate.parse --input /path/to/json_folder/ --out "$WORK/work/project.cstl" --name "My VN"
+<PFX> -m cstl_translate.parse --input /path/to/json_folder/ --out "$WORK/work/project.copas" --name "My VN"
 
 # EPUB
-<PFX> -m cstl_translate.parse --input /path/to/book.epub --out "$WORK/work/project.cstl" --name "My VN" --type epub --epub-tags p
+<PFX> -m cstl_translate.parse --input /path/to/book.epub --out "$WORK/work/project.copas" --name "My VN" --type epub --epub-tags p
 
 # LucaSystem TXT (one or many .txt)
-<PFX> -m cstl_translate.parse --input /path/to/luca_txt_folder/ --out "$WORK/work/project.cstl" --name "My VN" --type luca
+<PFX> -m cstl_translate.parse --input /path/to/luca_txt_folder/ --out "$WORK/work/project.copas" --name "My VN" --type luca
 ```
 
 Options:
@@ -99,23 +101,26 @@ Options:
 - `--source-lang` / `--target-lang` (default `Japanese` / `Indonesian`)
 - `--epub-tags` CSS selector for EPUB text extraction (default `p`)
 
-Prints: `parsed N lines -> .../project.cstl [type=json]`.
+Prints: `parsed N lines -> .../project.copas [type=json]`.
 
-### Step 2 alt — Import an existing .cstl
+### Step 2 alt — Continue from a CopasTool backup
 
-Already have a `.cstl` backup (from CSTL's Dashboard → Backup) or a previous cstl-translate `project.cstl`:
+CopasTool's current backup is `.copas`. When custom source payloads reach about 8 MiB, backups use `.copas.zip` with `project.json` and `custom_sources/`. Legacy `.cstl` JSON and `.cstl.zip` backups are still accepted. Keep the matching extension on the working copy, especially for ZIP backups:
 
 ```bash
-# Import / resume
-<PFX> -m cstl_translate.parse --input /path/to/existing.cstl --out "$WORK/work/project.cstl" --import-cstl
-# or simply copy:
-cp /path/to/existing.cstl "$WORK/work/project.cstl"
+# Copy a JSON backup, preserving project settings and metadata
+<PFX> -m cstl_translate.parse --input /path/to/project_backup.copas --out "$WORK/work/project.copas" --import-project
+
+# For a large ZIP backup, use .copas.zip for both input and output
+<PFX> -m cstl_translate.parse --input /path/to/project_backup.copas.zip --out "$WORK/work/project.copas.zip" --import-project
 ```
+
+The `--import-cstl` spelling remains as a backward-compatible alias. When loading a backup without `--import-project`, the parser preserves its project name and language settings unless explicitly overridden.
 
 Then check status:
 
 ```bash
-<PFX> -m cstl_translate.cstl_io status "$WORK/work/project.cstl"
+<PFX> -m cstl_translate.cstl_io status "$WORK/work/project.copas"
 ```
 
 ---
@@ -126,7 +131,7 @@ Generate a locked glossary from the source text, then **human-review and lock** 
 
 ```bash
 # Extract candidate glossary from source lines (frequency + CJK heuristics)
-<PFX> -m cstl_translate.glossary extract "$WORK/work/project.cstl" --out "$WORK/work/glossary.locked.json"
+<PFX> -m cstl_translate.glossary extract "$WORK/work/project.copas" --out "$WORK/work/glossary.locked.json"
 
 # Optional: seed from an existing CSTL glossary_text export
 <PFX> -m cstl_translate.glossary from-text --text /path/to/glossary.txt --out "$WORK/work/glossary.locked.json"
@@ -154,10 +159,10 @@ Locked glossary format:
 }
 ```
 
-Inject the locked glossary into the .cstl's `glossary_text` field (so CSTL UI sees it):
+Inject the locked glossary into the project's `glossary_text` field (so CopasTool sees it):
 
 ```bash
-<PFX> -m cstl_translate.glossary inject "$WORK/work/project.cstl" "$WORK/work/glossary.locked.json"
+<PFX> -m cstl_translate.glossary inject "$WORK/work/project.copas" "$WORK/work/glossary.locked.json"
 ```
 
 ### Module (optional) — reusable per-book settings
@@ -217,7 +222,7 @@ Confirm with the user before starting:
 ### 5a. Read next untranslated batch
 
 ```bash
-<PFX> -m cstl_translate.batch read "$WORK/work/project.cstl" --size 100
+<PFX> -m cstl_translate.batch read "$WORK/work/project.copas" --size 100
 ```
 
 Output: JSON array of `{line_num, file, name, message, trans_message}` for `is_translated=false` lines only. Re-running resumes automatically.
@@ -258,45 +263,49 @@ Rules:
 ### 5c. Write back
 
 ```bash
-<PFX> -m cstl_translate.batch write "$WORK/work/project.cstl" "$WORK/work/translations_001.json"
+<PFX> -m cstl_translate.batch write "$WORK/work/project.copas" "$WORK/work/translations_001.json"
 ```
 
-- Auto-creates timestamped backup: `project.cstl.bak.YYYYMMDD_HHMMSS`.
+- Auto-creates a timestamped backup beside the project file (`*.bak.YYYYMMDD_HHMMSS`; ZIP projects keep the `.copas.zip` extension in the backup name).
 - Prints: `applied N translation(s)`.
 - Repeat 5a → 5c until `batch read` returns `[]`.
 
 ### 5+ Parallel translation (optional, for large VNs)
 
-When the VN has many independent files and **style is locked via Mode A**, multiple subagents can translate different file ranges concurrently. See `references/parallel_translation.md` for the full flow (split, extract, dispatch template, normalization, serial write-back). **Iron rule: subagents never write `project.cstl` — they only produce translation JSONs; the main agent writes back serially.**
+When the VN has many independent files and **style is locked via Mode A**, multiple subagents can translate different file ranges concurrently. See `references/parallel_translation.md` for the full flow (split, extract, dispatch template, normalization, serial write-back). **Iron rule: subagents never write `project.copas` — they only produce translation JSONs; the main agent writes back serially.**
 
 ---
 
-## Step 6 — Export
+## Step 6 — Export or return the project to CopasTool
 
 ```bash
-# JSON (VNTP) — one file per original file, or single file
-<PFX> -m cstl_translate.export --cstl "$WORK/work/project.cstl" --output "$WORK/out/" --format json
+# JSON (VNTP) — one file per original file; multiple outputs also get a ZIP
+<PFX> -m cstl_translate.export --cstl "$WORK/work/project.copas" --output "$WORK/out/" --format json
 
 # EPUB — rebuild epub with translated text
-<PFX> -m cstl_translate.export --cstl "$WORK/work/project.cstl" --output "$WORK/out/" --format epub
+<PFX> -m cstl_translate.export --cstl "$WORK/work/project.copas" --output "$WORK/out/" --format epub
 
 # Luca TXT — rebuild txt files
-<PFX> -m cstl_translate.export --cstl "$WORK/work/project.cstl" --output "$WORK/out/" --format luca
+<PFX> -m cstl_translate.export --cstl "$WORK/work/project.copas" --output "$WORK/out/" --format luca
 ```
 
-Uses original structure/tags; respects `is_translated` (untranslated lines export source). For EPUB the original epub bytes are embedded in the .cstl only if the .cstl was created from EPUB via this skill or CSTL — otherwise EPUB export needs the original file via `--epub-source`.
+These helper exports support JSON, EPUB, and Luca TXT and respect `is_translated`. EPUB round-trip requires the original EPUB bytes in `epub_source` or `--epub-source`.
+
+For a custom-parser project, the helper can preserve `custom_raw`/`custom_index` and parser metadata in the backup, but it does not execute CopasTool's parser `serialize()`/`pack()` workflow. Restore the updated `.copas` or `.copas.zip` in CopasTool and use its installed parser to export the original game format. The same applies to parser-specific formats not handled by the helper.
+
+CopasTool's AI output modes are **numbered, block, XML, JSONL, and JSON array**. This agent pipeline writes directly to the project line records, so those AI copy formats do not change the batch JSON schema above. For copied AI output, use CopasTool's matching parser/format setting.
 
 ---
 
-## Step 6.5 — Polish / AI Check (optional)
+## Step 6.5 — Polish (optional)
 
-If `work/polish_prompt.md` exists (from module or hand-written), run a QA polish pass over already-translated lines:
+If `work/polish_prompt.md` exists (from module or hand-written), run a QA polish pass over already-translated lines. This pipeline polish pass is separate from CopasTool's AI Check feature:
 
 ```bash
 # Read next translated-but-not-polished batch
-<PFX> -m cstl_translate.batch read-translated "$WORK/work/project.cstl" --size 100
+<PFX> -m cstl_translate.batch read-translated "$WORK/work/project.copas" --size 100
 # Agent polishes per polish_prompt.md + glossary → work/polished_001.json  {line_num, polished_text, polished_name}
-<PFX> -m cstl_translate.polish write "$WORK/work/project.cstl" "$WORK/work/polished_001.json"
+<PFX> -m cstl_translate.polish write "$WORK/work/project.copas" "$WORK/work/polished_001.json"
 ```
 
 ---
@@ -304,7 +313,7 @@ If `work/polish_prompt.md` exists (from module or hand-written), run a QA polish
 ## Step 7 — Verify
 
 ```bash
-<PFX> -m cstl_translate.verify "$WORK/work/project.cstl" "$WORK/work/glossary.locked.json"
+<PFX> -m cstl_translate.verify "$WORK/work/project.copas" "$WORK/work/glossary.locked.json"
 ```
 
 Checks:
@@ -318,7 +327,7 @@ Outputs JSON issue list + summary count. Fix by `batch write` (or `polish write`
 ### Step 7+ — Scan (supplements verify)
 
 ```bash
-<PFX> -m cstl_translate.scan "$WORK/work/project.cstl" --locked "$WORK/work/glossary.locked.json" --mode all
+<PFX> -m cstl_translate.scan "$WORK/work/project.copas" --locked "$WORK/work/glossary.locked.json" --mode all
 # modes: all | discover | terms | strays | merges
 ```
 
@@ -339,22 +348,22 @@ export CSTL_PY=~/.venvs/cstl-translate/bin/python
 PFX="PYTHONPATH=$SKILL_DIR/scripts $CSTL_PY"
 
 # Parse
-$PFX -m cstl_translate.parse --input book.epub --out "$WORK/work/project.cstl" --name "My VN"
+$PFX -m cstl_translate.parse --input book.epub --out "$WORK/work/project.copas" --name "My VN"
 # Glossary
-$PFX -m cstl_translate.glossary extract "$WORK/work/project.cstl" --out "$WORK/work/glossary.locked.json"
-$PFX -m cstl_translate.glossary inject "$WORK/work/project.cstl" "$WORK/work/glossary.locked.json"
+$PFX -m cstl_translate.glossary extract "$WORK/work/project.copas" --out "$WORK/work/glossary.locked.json"
+$PFX -m cstl_translate.glossary inject "$WORK/work/project.copas" "$WORK/work/glossary.locked.json"
 # Prompt
 $PFX -m cstl_translate.prompt init --format numbered --out work/user_prompt.md
 # Batch
-$PFX -m cstl_translate.batch read "$WORK/work/project.cstl" --size 100
-$PFX -m cstl_translate.batch write "$WORK/work/project.cstl" "$WORK/work/translations_001.json"
+$PFX -m cstl_translate.batch read "$WORK/work/project.copas" --size 100
+$PFX -m cstl_translate.batch write "$WORK/work/project.copas" "$WORK/work/translations_001.json"
 # Export
-$PFX -m cstl_translate.export --cstl "$WORK/work/project.cstl" --output "$WORK/out/" --format json
+$PFX -m cstl_translate.export --cstl "$WORK/work/project.copas" --output "$WORK/out/" --format json
 # Verify / Scan
-$PFX -m cstl_translate.verify "$WORK/work/project.cstl" "$WORK/work/glossary.locked.json"
-$PFX -m cstl_translate.scan   "$WORK/work/project.cstl" --locked "$WORK/work/glossary.locked.json" --mode all
+$PFX -m cstl_translate.verify "$WORK/work/project.copas" "$WORK/work/glossary.locked.json"
+$PFX -m cstl_translate.scan   "$WORK/work/project.copas" --locked "$WORK/work/glossary.locked.json" --mode all
 # Status
-$PFX -m cstl_translate.cstl_io status "$WORK/work/project.cstl"
+$PFX -m cstl_translate.cstl_io status "$WORK/work/project.copas"
 ```
 
 ---
@@ -369,9 +378,13 @@ $PFX -m cstl_translate.cstl_io status "$WORK/work/project.cstl"
 
 **Skip a line (e.g. chapter number):** write `trans_message` equal to source or empty with `is_translated` handling per your policy; CSTL exports `trans_message || message` when untranslated.
 
-**EPUB export empty:** ensure original epub bytes are in `.cstl` (`epub_source` field) or pass `--epub-source`.
+**EPUB export empty:** ensure original EPUB bytes are in the project (`epub_source` field) or pass `--epub-source`.
 
-**Glossary not applied in CSTL UI:** did you `glossary inject`? CSTL UI reads `glossary_text` inside the .cstl.
+**Glossary not applied in CopasTool:** did you `glossary inject`? CopasTool reads `glossary_text` from the project backup.
+
+**Custom game format export:** restore the updated backup in CopasTool and export with the matching parser/plugin; these scripts do not run custom `serialize()`/`pack()` handlers.
+
+**Name missing in translation QA:** inspect the source line's `name` field. Any non-empty speaker name requires `trans_name`, even when it contains an apostrophe (`'` or `’`); do not infer a missing speaker from punctuation inside the name.
 
 ---
 

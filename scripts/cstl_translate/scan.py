@@ -1,4 +1,4 @@
-"""Scan .cstl for glossary gaps and artefacts (supplements verify)."""
+"""Scan CopasTool project lines for glossary gaps and artefacts (supplements verify)."""
 from __future__ import annotations
 
 import argparse
@@ -112,7 +112,7 @@ def scan(cstl_path: str, locked_path: str, mode: str = "all") -> dict:
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Scan .cstl for glossary gaps / artefacts")
+    ap = argparse.ArgumentParser(description="Scan CopasTool project for glossary gaps / artefacts")
     ap.add_argument("cstl_path")
     ap.add_argument("--locked", default="")
     ap.add_argument("--mode", choices=["all", "discover", "terms", "strays", "merges"], default="all")

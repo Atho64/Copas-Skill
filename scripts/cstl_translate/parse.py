@@ -1,4 +1,4 @@
-"""Parse raw VN inputs (JSON/ZIP/EPUB/Luca TXT or an existing .cstl) into a .cstl bundle."""
+"""Parse VN inputs or read CopasTool project backups into a project bundle."""
 from __future__ import annotations
 
 import base64
@@ -9,7 +9,7 @@ import re
 import zipfile
 from pathlib import Path
 
-from .cstl_io import backup_cstl, build_minimal_cstl, ensure_cstl, load_cstl, save_cstl
+from .cstl_io import build_minimal_cstl, ensure_cstl, is_project_backup_path, load_cstl, save_cstl
 
 
 def _normalize_file_base(p: str) -> str:
@@ -170,11 +170,11 @@ def parse_inputs(
     project_type: str = "auto",
     epub_tags: str = "p",
     name: str = "Imported Project",
-    source_lang: str = "Japanese",
-    target_lang: str = "Indonesian",
+    source_lang: str | None = None,
+    target_lang: str | None = None,
 ) -> dict:
     p = Path(input_path)
-    data = build_minimal_cstl(name, project_type if project_type != "auto" else "json", source_lang, target_lang)
+    data = build_minimal_cstl(name, project_type if project_type != "auto" else "json", source_lang or "Japanese", target_lang or "Indonesian")
     lines: list[dict] = []
     imported: list[str] = []
     cur = 1
@@ -183,7 +183,7 @@ def parse_inputs(
         ext = Path(path).suffix.lower()
         if ext == ".epub":
             return "epub"
-        if ext == ".cstl":
+        if ext in (".copas", ".cstl"):
             return "cstl"
         # Luca detection: .txt that contains MESSAGE(
         if ext == ".txt":
@@ -196,15 +196,16 @@ def parse_inputs(
             return "luca" if project_type == "luca" else "txt"
         return "json"
 
-    # If input is a .cstl, just load it (import path)
-    if p.is_file() and p.suffix.lower() == ".cstl":
+    # Current CopasTool backups are .copas JSON; legacy .cstl remains supported.
+    # Large custom-parser projects use .copas.zip with project.json + custom_sources/.
+    if p.is_file() and is_project_backup_path(str(p)):
         loaded = ensure_cstl(load_cstl(str(p)))
-        # preserve lines/imported as-is; override name/langs if provided
+        # Preserve project metadata unless the caller explicitly overrides it.
         if name and name != "Imported Project":
             loaded["projectName"] = name
-        if source_lang:
+        if source_lang is not None:
             loaded["source_lang"] = source_lang
-        if target_lang:
+        if target_lang is not None:
             loaded["target_lang"] = target_lang
         return loaded
 
@@ -264,7 +265,7 @@ def parse_inputs(
     epub_source_id = None
 
     if ptype == "epub":
-        # Single EPUB — preserve bytes in .cstl for later export round-trip
+        # Single EPUB — preserve bytes for later export round-trip
         epub_file = next((f for f in files if f.lower().endswith(".epub")), files[0])
         with open(epub_file, "rb") as f:
             epub_bytes = f.read()
@@ -435,21 +436,25 @@ def _parse_epub(epub_bytes: bytes, tags_selector: str = "p") -> tuple[list[dict]
 
 def main(argv=None):
     import argparse
-    ap = argparse.ArgumentParser(description="Parse VN inputs into a .cstl bundle")
+    ap = argparse.ArgumentParser(description="Parse VN inputs or import a CopasTool project backup")
     ap.add_argument("--input", required=True, help="File or folder to parse")
-    ap.add_argument("--out", required=True, help="Output .cstl path (work/project.cstl)")
+    ap.add_argument("--out", required=True, help="Output .copas or .copas.zip project path")
     ap.add_argument("--name", default="Imported Project")
     ap.add_argument("--type", dest="ptype", default="auto", choices=["auto", "json", "epub", "luca"])
     ap.add_argument("--epub-tags", default="p")
-    ap.add_argument("--source-lang", default="Japanese")
-    ap.add_argument("--target-lang", default="Indonesian")
-    ap.add_argument("--import-cstl", action="store_true", help="Copy an existing .cstl to --out")
+    ap.add_argument("--source-lang", default=None)
+    ap.add_argument("--target-lang", default=None)
+    ap.add_argument("--import-project", "--import-cstl", dest="import_project", action="store_true", help="Copy an existing .copas/.cstl project backup to --out")
     a = ap.parse_args(argv)
 
-    if a.import_cstl:
+    if a.import_project:
         import shutil
         if not os.path.exists(a.input):
             ap.error(f"input not found: {a.input}")
+        input_is_zip = a.input.lower().endswith((".copas.zip", ".cstl.zip"))
+        output_is_zip = a.out.lower().endswith((".copas.zip", ".cstl.zip"))
+        if input_is_zip != output_is_zip:
+            ap.error("keep the backup container type in --out (.copas/.cstl or .copas.zip/.cstl.zip)")
         os.makedirs(os.path.dirname(os.path.abspath(a.out)) or ".", exist_ok=True)
         shutil.copy2(a.input, a.out)
         s = load_cstl(a.out)

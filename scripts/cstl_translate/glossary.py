@@ -1,4 +1,4 @@
-"""Glossary extract / inject for CSTL .cstl. Also handles glossary.locked.json build."""
+"""Glossary extract / inject for CopasTool project backups. Also handles glossary.locked.json build."""
 from __future__ import annotations
 
 import argparse
@@ -120,7 +120,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="CSTL glossary helpers")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    ex = sub.add_parser("extract", help="Extract candidate glossary from .cstl source lines")
+    ex = sub.add_parser("extract", help="Extract candidate glossary from project source lines")
     ex.add_argument("cstl_path")
     ex.add_argument("--out", required=True)
     ex.add_argument("--top-k", type=int, default=200)
@@ -129,7 +129,7 @@ def main(argv=None):
     ft.add_argument("--text", required=True)
     ft.add_argument("--out", required=True)
 
-    inj = sub.add_parser("inject", help="Inject locked glossary into .cstl glossary_text")
+    inj = sub.add_parser("inject", help="Inject locked glossary into project glossary_text")
     inj.add_argument("cstl_path")
     inj.add_argument("locked_path")
 

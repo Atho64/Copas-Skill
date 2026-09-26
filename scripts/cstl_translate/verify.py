@@ -1,4 +1,4 @@
-"""Verify .cstl translations against locked glossary."""
+"""Verify CopasTool project translations against the locked glossary."""
 from __future__ import annotations
 
 import argparse
@@ -75,7 +75,7 @@ def verify(cstl_path: str, locked_path: str) -> list[dict]:
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Verify .cstl against locked glossary")
+    ap = argparse.ArgumentParser(description="Verify CopasTool project against the locked glossary")
     ap.add_argument("cstl_path")
     ap.add_argument("locked_path", nargs="?", default="")
     ap.add_argument("--json-out", default=None)
