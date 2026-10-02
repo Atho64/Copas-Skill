@@ -1,9 +1,9 @@
 ---
-name: cstl-translate
+name: copas-translate-skill
 description: Translate visual novels using CopasTool project backups (.copas, .copas.zip, legacy .cstl) or supported JSON/EPUB/Luca inputs; prepare glossaries, translate in aligned batches, and export or return the project to CopasTool. Use for requests to translate a VN with CSTL/CopasTool.
 ---
 
-# cstl-translate — Agent-based VN Translation for CopasTool
+# Copas-Translate-Skill — Agent-based VN Translation for CopasTool
 
 Let the **coding agent itself** translate, while the Python pipeline handles import, batch alignment, write-back, and validation. The workflow is designed around current [CopasTool](https://atho64.github.io/cstl) project backups:
 
@@ -26,11 +26,11 @@ Pipeline scripts live in `scripts/cstl_translate/` — no separate `pip install`
 
 ### 1. Skill location
 
-Place this `cstl-translate/` folder in the agent's skills directory:
+Place this `Copas-Translate-Skill/` folder in the agent's skills directory:
 
 ```
-~/.claude/skills/cstl-translate/     # Claude Code
-~/.codex/skills/cstl-translate/      # Codex
+~/.claude/skills/Copas-Translate-Skill/     # Claude Code
+~/.codex/skills/Copas-Translate-Skill/      # Codex
 ```
 
 Below, `$SKILL_DIR` means that directory. For Codex tool-name mapping see `references/codex-tools.md` if present.
@@ -48,7 +48,7 @@ python3 -m venv ~/.venvs/cstl-translate
 ### 3. Env vars (each new shell, or put in profile)
 
 ```bash
-export SKILL_DIR=~/.claude/skills/cstl-translate
+export SKILL_DIR=~/.claude/skills/Copas-Translate-Skill
 export CSTL_PY=~/.venvs/cstl-translate/bin/python
 ```
 
@@ -343,7 +343,7 @@ Add confirmed findings to `glossary.locked.json` and re-inject.
 ## Appendix A — Command cheat-sheet
 
 ```bash
-export SKILL_DIR=~/.claude/skills/cstl-translate
+export SKILL_DIR=~/.claude/skills/Copas-Translate-Skill
 export CSTL_PY=~/.venvs/cstl-translate/bin/python
 PFX="PYTHONPATH=$SKILL_DIR/scripts $CSTL_PY"
 
@@ -390,4 +390,4 @@ $PFX -m cstl_translate.cstl_io status "$WORK/work/project.copas"
 
 ## Appendix C — Slash commands (if installed as plugin)
 
-If installed as a Claude Code plugin, operations are available as `/cstl-translate:<cmd>` (see `commands/` if present). Otherwise use the `<PFX> -m cstl_translate.*` CLI above directly.
+If installed as a Claude Code plugin, operations are available as `/Copas-Translate-Skill:<cmd>` (see `commands/` if present). Otherwise use the `<PFX> -m cstl_translate.*` CLI above directly.
