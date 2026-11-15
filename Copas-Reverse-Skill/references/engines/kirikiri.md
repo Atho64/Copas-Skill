@@ -2,6 +2,8 @@
 
 **Evidence**: `*.xp3` archives (`XP3` + `0D 0A 20 0A 1A 0B 0D 0A` magic), or the header embedded in `Game.exe` (self-boot). KAG scenario tags in scripts; exe strings `Kirikiri`/`KAG`.
 
+**CopasTool native route**: standard XP3 archives or extracted folders containing PSB `.scn`/`.ks.scn` scenarios (including MDF-compressed PSB) can use its Rust extraction/rebuild path. It does not use Hxv4. Preserve the cache, archive-path sidecars, and scene/text indices in the project backup. Native patches are unencrypted XP3 and may not mount in games requiring encrypted indices. Plain KAG `.ks` scripts still use the text/parser route below. See [../guides/copastool_game_engine.md](../guides/copastool_game_engine.md).
+
 **Layout**: archives contain `.tjs` (engine code), `.ks` (KAG scenario), `.csv` config, plus resources. Text may sit in a plain `.xp3`, or in one packed inside the exe, or encrypted (`*.xp3` with custom header checks).
 
 **Extract**: unmodified XP3 → arc_unpacker/GARbro/msg-tool, or a Python XP3 reader (unencrypted variant: TOC at the offset in the header; entries zlib-compressed; filter mask 0xFF xor). Encrypted XP3 variants (common in commercial games) — use a published unpacker; if none opens it, stop and report. Scenario is usually `.ks`: `Text`/dialogue lines between KAG tags; `[name]`/speaker handling per game (often `#speaker` or inline).

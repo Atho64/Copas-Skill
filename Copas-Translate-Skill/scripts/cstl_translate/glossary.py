@@ -91,12 +91,16 @@ def serialize_glossary_text(locked: dict) -> str:
     for ch in locked.get("characters", []):
         src = ch.get("canonical") or ch.get("src") or ""
         dst = ch.get("render") or ch.get("dst") or ""
+        if ch.get("keep_source"):
+            dst = src
         desc = (ch.get("desc") or "character name").strip()
         if src and dst:
             lines.append(f"[character] {src} = {dst} {{{desc}}}")
     for t in locked.get("terms", []):
         src = t.get("src") or ""
         dst = t.get("dst") or ""
+        if t.get("keep_source"):
+            dst = src
         cat = (t.get("category") or t.get("type") or "term").strip().lower()
         desc = (t.get("desc") or "").strip()
         if src and dst:

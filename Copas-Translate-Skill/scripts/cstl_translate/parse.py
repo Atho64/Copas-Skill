@@ -29,7 +29,7 @@ def _parse_json_entries(arr, file_name: str, start_line: int) -> list[dict]:
             "line_num": cur,
             "file": file_name,
             "name": (None if entry.get("name") is None else str(entry["name"]).replace("\r\n", "\\n").replace("\n", "\\n").strip()) or None,
-            "message": str(entry.get("message", "")).replace("\r\n", "\\n").replace("\n", "\\n").strip(),
+            "message": str(entry.get("message", "")).replace("\r\n", "\\n").replace("\n", "\\n"),
             "trans_name": None,
             "trans_message": None,
             "is_translated": False,
@@ -342,10 +342,6 @@ def _parse_epub(epub_bytes: bytes, tags_selector: str = "p") -> tuple[list[dict]
         raise RuntimeError("beautifulsoup4 is required for EPUB parsing (pip install beautifulsoup4 lxml)")
     import xml.etree.ElementTree as ET
 
-    # Use stdlib zipfile to enumerate OPF/manifest
-    with zipfile.ZipFile(os.path.join(os.path.sep, "tmp_epub"), "r") as _:
-        pass
-    # Re-open from bytes
     import io
     zf = zipfile.ZipFile(io.BytesIO(epub_bytes), "r")
     # Find OPF via container.xml

@@ -1,6 +1,6 @@
 ---
 name: copas-reverse-skill
-description: Reverse engineer visual novel / galgame game folders — identify the engine, extract scenario text, translate it to Indonesian, then verify and inject the translation back into the game. Use for requests to unpack, extract, patch, reverse engineer, or translate a VN/galgame into Indonesian.
+description: Reverse engineer visual novel / galgame folders, extract scenario text, translate to Indonesian, and verify a game patch. Use CopasTool's native Artemis PFS/AST or Kirikiri XP3/PSB path when applicable, or engine-specific extraction and injection tools.
 ---
 
 # Copas-Reverse-Skill — Indonesian Galgame Reverse Engineering
@@ -15,7 +15,9 @@ identify engine → extract text → round-trip test → sample injection test
 - **Indonesian-first**: target language is Indonesian. Indonesian uses basic Latin letters, so most Japanese engines can display it **without font repacking** (unlike Chinese) — usually only encoding and length rules apply. See `references/guides/encoding_and_display.md`.
 - **Extraction is pluggable**: text can come from this skill **or from another extraction skill/tool** the user already has (e.g. GalTransl-GalGameReverse-Skill). If it's VNTP JSON (`[{"name", "message"}]`), we translate and verify from there — see `references/guides/external_tool_interop.md`.
 - **Translation engine**: the agent itself, following the sibling **Copas-Translate-Skill** (`../Copas-Translate-Skill/`) for glossary, rules, and batch flow. This skill handles everything outside that: engines, binaries, offsets, injection, verification.
-- **Never grow the file** (default): text is rewritten in place at fixed offsets. Overflowing translations fail loudly instead of silently corrupting scripts.
+- **Fixed-slot helper limits**: `copas_reverse.patch` rewrites text at fixed offsets without growing the file. Structure-aware engine rebuilds follow their own format rules; overflowing fixed slots fail instead of truncating text.
+
+CopasTool `0.1.14-beta.4` includes a native Game Engine route for Artemis PFS/AST and Kirikiri XP3/PSB, accessible from the dashboard and workspace. Read [references/guides/copastool_game_engine.md](references/guides/copastool_game_engine.md) when using it. The Python helpers remain a separate path and do not invoke the native backend.
 
 ## Safety & boundaries (non-negotiable)
 
@@ -77,6 +79,8 @@ Read-only scan: magic bytes, tell-tale file names, executable strings, extension
 2. Cross-check at least **two independent signals** (magic + layout + exe strings) before committing.
 3. Evidence conflicts → tell the user what was found, do read-only research, do not guess.
 
+For a supported native Game Engine project, follow the linked Game Engine guide through extraction, backup translation, patch build, and verification. Use a game copy because the app can write `patch_output` and install the patch into the selected folder. Keep its engine cache and `custom_index` scene/text mapping. Plain KAG `.ks` scripts and unsupported encrypted XP3 variants still need the engine-specific external route below.
+
 ## Phase 2 — Extract
 
 Follow `references/guides/extraction_playbook.md`. Summary:
@@ -85,7 +89,7 @@ Follow `references/guides/extraction_playbook.md`. Summary:
 2. Locate scenario scripts (largest files, character-encoding hit rate, dialogue-like strings).
 3. Export dialogue **semantically** (name / message / choices) into `id_input/*.json`.
    - Generic fallback for unknown flat text: `$PFX -m copas_reverse.carve file <bin> --encoding cp932 --require-cjk --out metadata/carve_<name>.json`, then convert runs to VNTP JSON by hand.
-4. **Round-trip test**: build a patch spec from the untranslated `id_input` and apply it — the result must be **byte-identical** to the original. If not, the extraction is lossy; fix it before anything else.
+4. **Round-trip test**: for fixed-slot injection, build a patch spec from untranslated `id_input` and require byte-identical output. For a structure-aware rebuild, also compare decoded commands, labels, indices, and untranslated text; explain recompression changes when archive byte equality is not the writer's contract. Resolve text/structure loss before translating.
 5. Deliver a summary table and suggest the sample injection test.
 
 ## Phase 3 — Sample injection test (before mass translation)
@@ -98,6 +102,8 @@ Follow `references/guides/extraction_playbook.md`. Summary:
 For CP932 games, Indonesian must fit the CP932 character set (it almost always does) — policy in `references/guides/encoding_and_display.md`.
 
 ## Phase 4 — Full translation (hand-off to Copas-Translate-Skill)
+
+The commands below are for the VNTP extraction route. For a native Game Engine project, import its `.copas` backup with `--import-project` and return the updated backup to the app; reparsing generic JSON discards reconstruction metadata. Both routes can use `batch read --with-context` and `batch write --expect-batch` for preceding/following context and checked alignment. Spreadsheet edits should merge into the original project. See `references/guides/copas_translate_integration.md` for the route-specific hand-off.
 
 ```bash
 CT="PYTHONPATH=$CT_SKILL/scripts python"
@@ -112,7 +118,7 @@ $CT -m cstl_translate.export --cstl "$WORK/project.copas" --output "$WORK/id_out
 
 Then `$PFX -m copas_reverse.vntp pair "$WORK/id_input" "$WORK/id_output"` must pass (same files, same counts) before any backfill.
 
-Interaction modes (sample-then-auto / every batch / fully auto) are defined in Copas-Translate-Skill — confirm the mode with the user before starting.
+Interaction modes (sample-then-auto / every batch / fully auto) are defined in Copas-Translate-Skill. Use the user's stated preference, including an existing fully auto request.
 
 ## Phase 5 — Backfill, verify, deliver
 
@@ -138,9 +144,10 @@ $PFX -m copas_reverse.patch verify --spec metadata/patch_<name>.json \
 
 ### Verification checklist before hand-off
 
-- [ ] `vntp pair` clean; `vntp validate` shows no kana residue in `id_output`
-- [ ] `patch verify` passed for every file; no changes outside spec ranges
-- [ ] Round-trip (untranslated lines untouched) confirmed byte-identical
+- [ ] VNTP route: `vntp pair` clean and `vntp validate` reviewed for `id_output`
+- [ ] Fixed-slot route: `patch verify` passed and no changes outside spec ranges
+- [ ] Structure-aware route: engine mappings, decoded text/commands, choices, and original archive hashes checked
+- [ ] Untranslated round-trip meets the chosen writer's byte or structural preservation contract
 - [ ] Count report: lines extracted / translated / injected / skipped (with reasons)
 - [ ] User launched the game copy: intro, choices, save/load, backlog all OK
 
@@ -214,6 +221,7 @@ Tests: `python -B -m unittest discover -s tests -v` (from `Copas-Reverse-Skill/`
 
 ## Guides
 
+- [references/guides/copastool_game_engine.md](references/guides/copastool_game_engine.md): native Artemis/Kirikiri extraction, cache-backed backup hand-off, patch output, and verification
 - `references/guides/engine_identification.md` — evidence discipline, unknown-format playbook
 - `references/guides/reverse_engineering_method.md` — the agent's own RE loop: header/table inference, obfuscation testing, opcode mapping, parser+writer with round-trip proof
 - `references/guides/re_tools_mcp.md` — optional escalation to IDA/Ghidra/x64dbg via MCP servers, for encryption/key-derivation walls (authorization rules inside)
