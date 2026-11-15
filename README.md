@@ -4,12 +4,14 @@ Agent skills for translating visual novels into Indonesian, built around [CopasT
 
 | Skill | Purpose |
 |---|---|
-| [`Copas-Translate-Skill/`](Copas-Translate-Skill/) | Translate backups or JSON/EPUB/Luca inputs with a locked glossary, preceding/following context, checked batch alignment, export, and QA. Includes guidance for app spreadsheet, Auto Copas, and AI Check workflows. |
+| [`Copas-Translate-Skill/`](Copas-Translate-Skill/) | Translate backups or JSON/EPUB/Luca inputs with saved task prompts, a locked glossary, preceding/following context, checked batch alignment, export, and QA. Includes guidance for app spreadsheet, Auto Copas, and AI Check workflows. |
 | [`Copas-Reverse-Skill/`](Copas-Reverse-Skill/) | Extract and verify Indonesian game patches through engine-specific tools or CopasTool's native Artemis PFS/AST and Kirikiri XP3/PSB route. |
 
 Each folder is a self-contained skill with its own `SKILL.md`. To install, copy (or symlink) a skill folder into your agent's skills directory, e.g. `~/.claude/skills/Copas-Translate-Skill/`.
 
 The two skills are designed to chain: **Copas-Reverse-Skill** extracts game text into VNTP JSON (`id_input/`) and injects the translated JSON (`id_output/`) back; **Copas-Translate-Skill** owns glossary, translation rules, and batch QA in between.
+
+For existing `.copas`/`.copas.zip` projects, translation, glossary, review, and agent task packets use their matching saved prompts by default. Prompt variables are resolved for the batch; saved text is retained. Parallel workers receive saved prompts and context from neighboring project lines as well. See [the translation workflow](Copas-Translate-Skill/SKILL.md) for prompt extraction, task selection, and the explicit `--lines-only` compatibility option.
 
 Development checks: `python -B -m unittest discover -s tests -v` (run inside a skill folder that has `tests/`).
 

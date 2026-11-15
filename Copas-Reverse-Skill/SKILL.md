@@ -103,14 +103,14 @@ For CP932 games, Indonesian must fit the CP932 character set (it almost always d
 
 ## Phase 4 — Full translation (hand-off to Copas-Translate-Skill)
 
-The commands below are for the VNTP extraction route. For a native Game Engine project, import its `.copas` backup with `--import-project` and return the updated backup to the app; reparsing generic JSON discards reconstruction metadata. Both routes can use `batch read --with-context` and `batch write --expect-batch` for preceding/following context and checked alignment. Spreadsheet edits should merge into the original project. See `references/guides/copas_translate_integration.md` for the route-specific hand-off.
+The commands below are for the VNTP extraction route. For a native Game Engine project, import its `.copas` backup with `--import-project` and return the updated backup to the app; reparsing generic JSON discards reconstruction metadata. Both routes use default `batch read` task packets with saved prompts and preceding/following context, then `batch write --expect-batch` for checked alignment. Spreadsheet edits should merge into the original project. See `references/guides/copas_translate_integration.md` for the route-specific hand-off.
 
 ```bash
 CT="PYTHONPATH=$CT_SKILL/scripts python"
 
 # 1. id_input/*.json are valid VNTP — parse the whole folder into a project
 $CT -m cstl_translate.parse --input "$WORK/id_input" --out "$WORK/project.copas" --name "My VN"
-# 2. glossary (extract → human review → inject) and user_prompt.md, per that skill
+# 2. seed saved glossary, follow the glossary task prompt, review/merge/inject per that skill
 # 3. batch loop: the agent translates; batch read / batch write until done
 # 4. export back into the inject folder
 $CT -m cstl_translate.export --cstl "$WORK/project.copas" --output "$WORK/id_output" --format json

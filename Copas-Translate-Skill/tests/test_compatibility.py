@@ -286,7 +286,7 @@ class CompatibilityTests(unittest.TestCase):
         updates = self.root / "translations.json"
         updates.write_text(json.dumps([self.translation()]), encoding="utf-8-sig")
         run("batch", "write", self.project, updates, "--expect-batch", snapshot)
-        self.assertEqual(json.loads(run("batch", "read", self.project, "--size", 1))[0]["line_num"], 3)
+        self.assertEqual(json.loads(run("batch", "read", self.project, "--size", 1))["lines"][0]["line_num"], 3)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import argparse
 import json
 
 from .cstl_io import backup_cstl, ensure_cstl, load_cstl, save_cstl
+from .prompt import project_prompt_info
 
 
 def _ordered_lines(data: dict) -> list[dict]:
@@ -12,12 +13,25 @@ def _ordered_lines(data: dict) -> list[dict]:
     return sorted(data.get("lines", []), key=lambda line: order.get(line.get("file"), len(order)))
 
 
+def _selected_lines(data: dict, size: int, task: str = "translate", offset: int = 0, files=None) -> list[dict]:
+    if size < 1 or offset < 0:
+        raise ValueError("batch size must be positive and offset non-negative")
+    if task not in ("translate", "agent", "glossary", "ai-check"):
+        raise ValueError(f"unsupported batch task: {task}")
+    eligible = [line for line in _ordered_lines(data)
+                if not line.get("_hidden") and (line.get("message") or "").strip()]
+    if files is not None:
+        allowed = set(files)
+        eligible = [line for line in eligible if line.get("file") in allowed]
+    if task in ("translate", "agent"):
+        eligible = [line for line in eligible if not line.get("is_translated")]
+    elif task == "ai-check":
+        eligible = [line for line in eligible if line.get("is_translated")]
+    return eligible[offset:offset + size]
+
+
 def _batch_lines(data: dict, size: int) -> list[dict]:
-    if size < 1:
-        raise ValueError("batch size must be positive")
-    return [line for line in _ordered_lines(data)
-            if not line.get("_hidden") and not line.get("is_translated")
-            and (line.get("message") or "").strip()][:size]
+    return _selected_lines(data, size)
 
 
 def read_batch(cstl_path: str, size: int = 100) -> list[dict]:
@@ -34,9 +48,9 @@ def read_batch(cstl_path: str, size: int = 100) -> list[dict]:
     return out
 
 
-def read_context_batch(cstl_path: str, size: int = 100, before=None, after=None) -> dict:
+def read_context_batch(cstl_path: str, size: int = 100, before=None, after=None, task="translate", offset=0, files=None) -> dict:
     data = ensure_cstl(load_cstl(cstl_path))
-    selected = _batch_lines(data, size)
+    selected = _selected_lines(data, size, task, offset, files)
     before = int(data.get("context_lines", 10) if before is None else before)
     after = int(data.get("context_lines_after", 0) if after is None else after)
     if before < 0 or after < 0:
@@ -64,6 +78,7 @@ def read_context_batch(cstl_path: str, size: int = 100, before=None, after=None)
         "currentBackground": data.get("currentBackground", ""),
         "context_before": records(preceding), "lines": records(selected),
         "context_after": records(following),
+        **project_prompt_info(data, task, len(selected)),
     }
 
 
@@ -145,10 +160,15 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Batch read/write for CopasTool project backups")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    r = sub.add_parser("read", help="Print next untranslated batch as JSON")
+    r = sub.add_parser("read", help="Print a task packet with saved prompts, context, and lines")
     r.add_argument("cstl_path")
     r.add_argument("--size", type=int, default=100)
-    r.add_argument("--with-context", action="store_true", help="Emit a lines array with read-only context and project prompt/glossary")
+    rv = r.add_mutually_exclusive_group()
+    rv.add_argument("--with-context", action="store_true", help="Compatibility alias for the default task packet")
+    rv.add_argument("--lines-only", action="store_true", help="Emit a legacy line array without prompts/context")
+    r.add_argument("--task", choices=["translate", "agent", "glossary", "ai-check"], default="translate")
+    r.add_argument("--offset", type=int, default=0, help="Skip this many eligible task lines")
+    r.add_argument("--file", action="append", dest="files", help="Restrict assigned lines to an exact project filename; repeat for multiple files. Context still comes from the full project.")
     r.add_argument("--context-before", type=int, help="Override saved context_lines")
     r.add_argument("--context-after", type=int, help="Override saved context_lines_after")
 
@@ -156,6 +176,12 @@ def main(argv=None):
     rt.add_argument("cstl_path")
     rt.add_argument("--size", type=int, default=100)
     rt.add_argument("--offset", type=int, default=0, help="Skip this many translated lines when reviewing successive batches")
+    rt.add_argument("--file", action="append", dest="files", help="Restrict reviewed lines to these project files; context still comes from the full project")
+    rtv = rt.add_mutually_exclusive_group()
+    rtv.add_argument("--with-context", action="store_true", help="Compatibility alias for the default AI Check task packet")
+    rtv.add_argument("--lines-only", action="store_true", help="Emit a legacy translated-line array without prompts/context")
+    rt.add_argument("--context-before", type=int)
+    rt.add_argument("--context-after", type=int)
 
     w = sub.add_parser("write", help="Write translations back from a JSON file")
     w.add_argument("cstl_path")
@@ -165,16 +191,21 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.cmd == "read":
         try:
-            if not a.with_context and (a.context_before is not None or a.context_after is not None):
-                ap.error("context overrides require --with-context")
-            batch = (read_context_batch(a.cstl_path, a.size, a.context_before, a.context_after)
-                     if a.with_context else read_batch(a.cstl_path, size=a.size))
+            if a.lines_only and (a.context_before is not None or a.context_after is not None):
+                ap.error("context overrides cannot be used with --lines-only")
+            batch = read_context_batch(a.cstl_path, a.size, a.context_before, a.context_after, a.task, a.offset, a.files)
+            if a.lines_only:
+                batch = batch["lines"]
         except ValueError as e:
             ap.error(str(e))
         print(json.dumps(batch, ensure_ascii=False))
     elif a.cmd == "read-translated":
         try:
-            batch = read_translated_batch(a.cstl_path, size=a.size, offset=a.offset)
+            if a.lines_only and (a.context_before is not None or a.context_after is not None):
+                ap.error("context overrides cannot be used with --lines-only")
+            batch = read_context_batch(a.cstl_path, a.size, a.context_before, a.context_after, "ai-check", a.offset, a.files)
+            if a.lines_only:
+                batch = batch["lines"]
         except ValueError as e:
             ap.error(str(e))
         print(json.dumps(batch, ensure_ascii=False))

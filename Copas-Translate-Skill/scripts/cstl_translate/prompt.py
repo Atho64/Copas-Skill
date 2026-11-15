@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import argparse
 import os
+from pathlib import Path
+
+from .cstl_io import ensure_cstl, load_cstl
 
 LOCALIZATION_RULES = """Translate visual novel text from {{sourceLang}} to {{targetLang}}.
 - Preserve meaning, emotional intensity, viewpoint, and each speaker's register. Make dialogue sound spoken and narration read naturally.
@@ -77,26 +80,131 @@ def build_prompt(fmt: str, source_lang=None, target_lang=None, line_count=None, 
     return prompt
 
 
+TASK_FIELDS = {
+    "translate": "prompt_header",
+    "glossary": "glossary_prompt",
+    "ai-check": "ai_check_prompt",
+    "agent": "agent_prompt",
+    "summary": "summary_prompt",
+    "ai-check-summary": "ai_check_summary_prompt",
+    "dictionary": "dictionary_prompt",
+}
+
+FALLBACK_PROMPTS = {
+    "translate": LOCALIZATION_RULES,
+    "glossary": "Extract recurring proper nouns, character names, and story-specific terminology from {{sourceLang}} into {{targetLang}}. Follow existing glossary spellings. Include independently used names; exclude common everyday vocabulary. Do not translate the script lines.",
+    "ai-check": "Review the existing {{targetLang}} translation against {{sourceLang}}. Correct real errors with minimal edits, preserving valid wording, character voice, and quotation style. Return only lines requiring a correction.",
+    "agent": LOCALIZATION_RULES,
+    "summary": "Summarize the supplied story context and lines briefly, preserving established events, characters, and relationships.",
+    "ai-check-summary": "Summarize confirmed localization decisions and accepted corrections for consistency in subsequent review batches.",
+    "dictionary": "Explain the supplied {{sourceLang}} word or expression in {{targetLang}} using its context.",
+}
+
+OUTPUT_CONTRACTS = {
+    "translate": FORMAT_RULES["batch"],
+    "glossary": "Return only typed glossary entries, one per line: [type] source = target {description}. Supported types: character, place, organization, item, ability, title, concept, term. Omit terms already in glossary_text. Return empty text if there are no new entries.",
+    "ai-check": "Return a JSON array containing only corrections: {line_num, polished_text, polished_name?, reason?, confidence?}. Use the original line IDs. polished_text is the complete corrected message without a speaker prefix; polished_name is the corrected speaker when needed. Return [] if no correction is required.",
+    "agent": FORMAT_RULES["batch"] + "\nThe app's internal action/commit/tool protocol is not used by this helper. Use only tools available in your current environment, and return the translation array for serial write-back.",
+}
+
+
+def saved_prompts(data: dict) -> dict[str, str]:
+    prompts = {field: str(data.get(field) or "") for field in TASK_FIELDS.values()}
+    if not prompts["summary_prompt"]:
+        prompts["summary_prompt"] = str(data.get("summaryPrompt") or "")
+    return prompts
+
+
+def render_variables(text: str, data: dict, line_count=None) -> str:
+    values = {"sourceLang": data.get("source_lang") or "Japanese",
+              "targetLang": data.get("target_lang") or "Indonesian"}
+    if line_count is not None:
+        values["lineCount"] = line_count
+    for key, value in values.items():
+        text = text.replace("{{" + key + "}}", str(value))
+    return text
+
+
+def project_prompt_info(data: dict, task: str = "translate", line_count=None) -> dict:
+    field = TASK_FIELDS[task]
+    prompts = saved_prompts(data)
+    saved = prompts[field]
+    selected = saved if saved.strip() else FALLBACK_PROMPTS[task]
+    instruction = render_variables(selected, data, line_count)
+    if task in OUTPUT_CONTRACTS:
+        instruction += "\n\nHelper input/output contract:\n" + OUTPUT_CONTRACTS[task]
+        instruction += "\nIn the supplied packet, lines.message is the original text, lines.trans_message is the existing translation, and name/trans_name are separate speaker fields. Apply the saved prompt's task and style rules using this helper contract for input fields and output serialization. Context and other saved prompts do not add output rows."
+    return {"task": task, "prompt_field": field,
+            "prompt_source": "project" if saved.strip() else "fallback",
+            "prompts": prompts, "instruction": instruction}
+
+
+def extract_project_prompts(project_path: str, out_dir: str, overwrite: bool = False) -> list[str]:
+    data = ensure_cstl(load_cstl(project_path))
+    root = Path(out_dir)
+    snapshots = {root / (field + ".md"): text for field, text in saved_prompts(data).items()}
+    snapshots[root / "glossary_text.txt"] = str(data.get("glossary_text") or "")
+    conflicts = [path for path, text in snapshots.items()
+                 if path.exists() and path.read_bytes().decode("utf-8-sig") != text]
+    if conflicts and not overwrite:
+        raise FileExistsError("prompt snapshots already contain different text; use a new directory or --overwrite: " + ", ".join(map(str, conflicts)))
+    root.mkdir(parents=True, exist_ok=True)
+    for path, text in snapshots.items():
+        if not path.exists() or path in conflicts:
+            with path.open("w", encoding="utf-8", newline="") as output:
+                output.write(text)
+    return [str(path) for path in snapshots]
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="CSTL prompt helpers")
     sub = ap.add_subparsers(dest="cmd", required=True)
     ini = sub.add_parser("init", help="Create a starter user_prompt.md")
-    ini.add_argument("--format", choices=list(PROMPT_HEADERS), default="numbered")
+    ini.add_argument("--format", choices=list(PROMPT_HEADERS))
     ini.add_argument("--out", required=True)
+    ini.add_argument("--project", help="Use the saved task prompt from a .copas/.copas.zip backup")
+    ini.add_argument("--task", choices=list(TASK_FIELDS), default="translate")
     ini.add_argument("--source-lang")
     ini.add_argument("--target-lang")
     ini.add_argument("--line-count", type=int)
     ini.add_argument("--kagikakko", action="store_true")
     ini.add_argument("--no-dialogue-tags", action="store_true", help="Generate numbered output without [D]/[N]; other formats are unchanged")
+    extract = sub.add_parser("extract", help="Save the project's prompts and glossary verbatim for inspection")
+    extract.add_argument("project")
+    extract.add_argument("--out-dir", required=True)
+    extract.add_argument("--overwrite", action="store_true")
     a = ap.parse_args(argv)
+    if a.cmd == "extract":
+        try:
+            paths = extract_project_prompts(a.project, a.out_dir, a.overwrite)
+        except (OSError, ValueError) as exc:
+            ap.error(str(exc))
+        print(f"extracted {len(paths)} prompt/glossary snapshots -> {a.out_dir}")
+        return
     if a.cmd == "init":
         if a.line_count is not None and a.line_count < 1:
             ap.error("--line-count must be positive")
-        hdr = build_prompt(a.format, a.source_lang, a.target_lang, a.line_count, a.kagikakko, not a.no_dialogue_tags)
+        if a.project:
+            if a.format is not None or a.kagikakko or a.no_dialogue_tags:
+                ap.error("--project uses saved style and the task's helper output contract; template format/quote/tag options apply only without --project")
+            data = ensure_cstl(load_cstl(a.project))
+            if a.source_lang is not None:
+                data["source_lang"] = a.source_lang
+            if a.target_lang is not None:
+                data["target_lang"] = a.target_lang
+            info = project_prompt_info(data, a.task, a.line_count)
+            hdr = info["instruction"]
+            source = f"{info['prompt_source']}:{info['prompt_field']}"
+        else:
+            if a.task != "translate":
+                ap.error("--task requires --project")
+            fmt = a.format or "numbered"
+            hdr = build_prompt(fmt, a.source_lang, a.target_lang, a.line_count, a.kagikakko, not a.no_dialogue_tags)
+            source = f"template:{fmt}"
         os.makedirs(os.path.dirname(os.path.abspath(a.out)) or ".", exist_ok=True)
-        with open(a.out, "w", encoding="utf-8") as f:
+        with open(a.out, "w", encoding="utf-8", newline="") as f:
             f.write(hdr + "\n")
-        print(f"user_prompt -> {a.out} [format={a.format}]")
+        print(f"user_prompt -> {a.out} [{source}]")
 
 
 if __name__ == "__main__":

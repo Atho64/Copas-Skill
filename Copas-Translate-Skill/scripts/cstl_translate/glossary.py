@@ -133,6 +133,10 @@ def main(argv=None):
     ft.add_argument("--text", required=True)
     ft.add_argument("--out", required=True)
 
+    fp = sub.add_parser("from-project", help="Seed locked JSON from the backup's saved glossary_text")
+    fp.add_argument("cstl_path")
+    fp.add_argument("--out", required=True)
+
     inj = sub.add_parser("inject", help="Inject locked glossary into project glossary_text")
     inj.add_argument("cstl_path")
     inj.add_argument("locked_path")
@@ -150,6 +154,12 @@ def main(argv=None):
         with open(a.out, "w", encoding="utf-8") as f:
             json.dump(locked, f, ensure_ascii=False, indent=2)
         print(f"locked glossary -> {a.out}")
+    elif a.cmd == "from-project":
+        data = ensure_cstl(load_cstl(a.cstl_path))
+        locked = parse_glossary_text(data.get("glossary_text") or "")
+        with open(a.out, "w", encoding="utf-8") as f:
+            json.dump(locked, f, ensure_ascii=False, indent=2)
+        print(f"project glossary -> {a.out}")
     elif a.cmd == "inject":
         inject_into_cstl(a.cstl_path, a.locked_path)
 

@@ -27,6 +27,10 @@ Current localization defaults use context to resolve omitted subjects and pronou
 
 App prompt variables: `{{sourceLang}}`, `{{targetLang}}`, `{{lineCount}}`. `context_lines` supplies preceding context; `context_lines_after` supplies following context (default 0, app range 0 to 50). `context_type` chooses raw, translated, or both. `<Context>` and `<Context_After>` are reference-only sections. They must not add translated rows. Following context happens later in the story.
 
+In the helper route, default `batch read` supplies the saved `prompt_header` as a rendered `instruction`, plus glossary and before/after context. `--task glossary` uses `glossary_prompt`, `read-translated` uses `ai_check_prompt`, and `--task agent` uses `agent_prompt`. The helper appends its own serialization contract so the agent can retain saved task/style choices while returning compatible JSON or typed glossary entries. Each packet also exposes all seven saved prompts verbatim; apply only the active task's instructions. `prompt init --project ... --task ...` prepares a saved prompt for other tasks, and `prompt extract` saves raw snapshots for inspection. A generic fallback is used only for an absent/blank task prompt.
+
+Parallel workers receive the same task packets. `--file` restricts their assigned `lines` while before/after context is selected from the full project. Respect the saved context counts and `context_type`; a project with zero following-context lines produces an empty `context_after` unless the user requests an override.
+
 With `safe_tags_for_chatgpt`, the app can replace section tags with `=== LABEL ===` markers. Keep the same distinction between context, glossary, summary, and the lines to translate. Do not copy these section labels into dialogue.
 
 Sources: `src/constants.ts`, `src/ai-format.ts`, `src/speaker-name.ts`, `src/translate.ts`, `src/project.ts`.

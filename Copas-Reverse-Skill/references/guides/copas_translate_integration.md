@@ -28,16 +28,18 @@ CR="PYTHONPATH=$CR_SKILL/scripts $CSTL_PY"
 $CT -m cstl_translate.parse --input "$WORK/id_input" --out "$WORK/project.copas" --name "My VN"
 $CT -m cstl_translate.cstl_io status "$WORK/project.copas"
 
-# 2. glossary: extract, human-review, inject   (Copas-Translate-Skill Step 3)
-$CT -m cstl_translate.glossary extract "$WORK/project.copas" --out "$WORK/glossary.locked.json"
-#   ... user edits ... then:
+# 2. glossary: preserve saved entries, then follow the saved glossary task prompt
+$CT -m cstl_translate.glossary from-project "$WORK/project.copas" --out "$WORK/glossary.locked.json"
+$CT -m cstl_translate.batch read "$WORK/project.copas" --task glossary --size 500 > "$WORK/glossary_batch_001.json"
+#   ... agent reads packet instruction, returns typed new terms; review and merge into locked JSON ...
 $CT -m cstl_translate.glossary inject "$WORK/project.copas" "$WORK/glossary.locked.json"
 
-# 3. user_prompt.md (name style, honorifics, register) — Copas-Translate-Skill Step 3+
+# 3. optional prompt file from the saved project prompt (fallback for a new raw import)
+$CT -m cstl_translate.prompt init --project "$WORK/project.copas" --out "$WORK/user_prompt.md"
 
 # 4. translation loop — Copas-Translate-Skill Step 5 (agent translates; batch read/write)
-$CT -m cstl_translate.batch read "$WORK/project.copas" --size 100 --with-context > "$WORK/batch_001.json"
-#   ... agent writes translations_001.json ...
+$CT -m cstl_translate.batch read "$WORK/project.copas" --size 100 > "$WORK/batch_001.json"
+#   ... agent follows packet instruction and context, writes translations_001.json for lines only ...
 $CT -m cstl_translate.batch write "$WORK/project.copas" "$WORK/translations_001.json" --expect-batch "$WORK/batch_001.json"
 
 # 5. export back into the inject folder
@@ -54,7 +56,8 @@ Notes:
 - `\\n` stored in the project becomes a real `\n` in the exported JSON; `patch build-spec`/`apply` maps `\n` to the engine byte (e.g. `--newline-hex 0a`).
 - Untranslated lines export as source text; patching them is an identity operation (byte-identical), so partial progress can be test-injected safely.
 - Interaction mode (sample-then-auto / every batch / fully auto) and the glossary workflow are defined in Copas-Translate-Skill. Use the user's stated preference; target language defaults to Indonesian.
-- Translate only the saved context envelope's `lines`; `context_before` and `context_after` are reference-only. Preserve placeholders and meaningful trailing spaces.
+- Follow the packet's active saved `instruction`: translation uses `prompt_header`, glossary uses `glossary_prompt`, review uses `ai_check_prompt`, and agent translation uses `agent_prompt`. Other saved prompts do not govern the active task. Explicit user directions can override project choices; local style files supplement them.
+- Translate only packet `lines`; `context_before` and `context_after` are reference-only. Preserve placeholders and meaningful trailing spaces. Parallel worker packets should use `batch read --file EXACT_FILENAME` so full-project preceding/following context is retained outside the assigned files; see the translation skill's parallel reference.
 - Spreadsheet edits should merge into the original backed-up project. New projects restored from sheets lack raw export resources and native engine paths/cache.
 
 ## Fallback: direct agent translation (sibling missing)
