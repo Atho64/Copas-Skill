@@ -16,6 +16,7 @@ Copy this to `<WORK>/STYLE_GUIDE.md` and lock in project specifics (derived from
 - **Dialogue quotes**: choose ONE and keep across all files — standard `"..."` (nested `'...'`) **OR** Japanese `「...」` (`『...』`) if `kagikakko` is enabled. Never double-wrap dialogue that already has a speaker tag.
 - **Narration**: no outer quotes.
 - **Japanese punctuation normalization** (`ja-id` / `ja-en`): `。` → `.`, `、`, → `,`, `！？` → `!?`, fullwidth `\u3000` removed/normalized, `──` / `―` → `—` or `--` consistently, ellipsis `...` or `…` consistently.
+- **SFX, onomatopoeia & vocal fillers** (`ja-id` / `en-id`): always use native Indonesian sounds matching context (`emm...`/`ehm...`/`hmm...`/`anu...`, `*hiks*`/`hiks...`/`terisak`/`sesenggukan`, `hah...`, `deg`/`tersentak`, `glek`, `uhuk`, `cih`/`ck`), never English comic SFX (`uhhh`, `snif/sniff`, `sigh`, `gasp`, `hmph`, `tch`).
 - **CP932 / Shift-JIS patch safety** (when exporting to classic JP engines): stick to ASCII `A–Z a–z 0–9` and avoid accented characters (`é`, `è`, `ü`).
 
 ## 3. Character Names, Speakers & Honorifics

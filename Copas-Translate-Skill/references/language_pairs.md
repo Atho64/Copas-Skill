@@ -29,7 +29,17 @@ Translate **communicative function**, not dictionary glosses:
 ### 4. Names, Honorifics & Onomatopoeia
 - **Hepburn & standalone forms**: keep surname, given name, and nickname distinct in `glossary.locked.json` (`Hayakawa Mugi`, `Hayakawa`, `Mugi`, `Mucchan`). Never guess ambiguous kanji readings; flag unresolved names in `BOOK_BIBLE.md` / `needs_review`.
 - **Honorifics**: follow project policy (keep `-san/-kun/-chan/-sama/-senpai/-sensei` OR localize to Indonesian kinship/titles `Kak/Pak/Bu/Guru`). Never mix both policies within the same relationship.
-- **Onomatopoeia (giongo/gitaigo)**: localize into vivid Indonesian verbs, adverbs, or natural sound phrasing (`ドキドキ` → `berdebar kencang` / `deg-degan`, `シーン` → `hening seketika`, `ニヤリ` → `menyeringai`), never leaving raw katakana.
+- **Onomatopoeia & SFX (giongo/gitaigo & vocal fillers)**: localize strictly into vivid, genuine Indonesian verbs, adverbs, or native Indonesian vocal cues matching scene emotion/context. **Never** leave raw katakana or import English comic SFX / fillers (`uh/uhh/uhhh`, `uhm`, `erm`, `hng/hngh/ngh/ungh/mmph`, `sniff/snif/sniffle`, `sob`, `sigh`, `gasp`, `gulp`, `groan`, `grunt`, `hmph`, `tch`, `tsk`, `pfft`, `cough`, `pant`, `smirk`, `sweatdrop`, `eek`, `ugh`, `ergh`):
+  - **Hesitation / thinking / clearing throat (`えっと`, `うーん`, `うー`, `uhhh`, `uhm`, `erm`)**: `emm...`, `hmm...`, `anu...` (ragu/berpikir), `ehm...` (berdeham), `eh...` / `lho...` (bingung).
+  - **Straining / pain / muffled effort (`ぐっ`, `くっ`, `うぅ`, `んっ`, `んっしょ`, `hng`, `hngh`, `mmph`, `groan`, `grunt`)**: `akh!`, `aduh...`, `duh...` (kesakitan/terbentur); `hup!` (angkat beban/tenaga); `mmm...` / `hmm...` (mulut terbungkam/menahan suara); `mengerang tertahan` / `menggeram` (narasi).
+  - **Crying vs runny nose (`くすん`, `ぐすっ`, `ひっく`, `ずずっ`, `sniff`, `snif`, `sob`)**: `*hiks*`, `hiks...`, `huu...` / `terisak`, `sesenggukan` (menangis); `srot...`, `*menarik ingus*` (pilek/menyedot ingus); `*membuang ingus*` / `*mengelap hidung*` (meniup tisu `ちーん`).
+  - **Sighing / relief / exhaustion (`ふう`, `はあ`, `sigh`)**: `hah...`, `huh...`, `menghela napas`.
+  - **Startled / shocked (`あっ`, `ひっ`, `ぎくっ`, `gasp`)**: `hah?!`, `ih!`, `deg`, `tersentak`.
+  - **Swallowing / nervous (`ごくり`, `gulp`)**: `glek`, `menelan ludah`.
+  - **Scoffing / clicking tongue (`ふん`, `ちっ`, `hmph`, `tch`, `tsk`, `pfft`)**: `cih`, `heh`, `ck` / `decaknya`, `mendengus`.
+  - **Coughing (`ごほん`, `げほっ`, `cough`)**: `uhuk`, `ehm`, `terbatuk`.
+  - **Panting (`はぁはぁ`, `ぜぇぜぇ`, `pant`)**: `hah... hah...`, `hh... hh...`, `terengah-engah`.
+  - **Heartbeat / silence (`ドキドキ`, `シーン`)**: `dag-dig-dug` / `deg-degan` / `berdebar kencang`; `hening...` / `sunyi seketika`; `ニヤリ` → `menyeringai`.
 
 ### 5. Natural Indonesian Syntax & Anti-Translationese
 - **Spoken dialogue vs narration**: dialogue must breathe like real speech (contractions where appropriate, natural interruptions `—`, realistic hesitations); narration should flow smoothly without stiffening into bureaucratic prose.
@@ -53,6 +63,7 @@ Translate **communicative function**, not dictionary glosses:
 ### 3. Idioms, Phrasal Verbs & Pronouns
 - Translate idioms and phrasal verbs by intent (`turned on her heel` → `langsung berbalik`, `rule out` → `mengesampingkan`, `So?` → `Memangnya kenapa?`).
 - Disambiguate `you`, `brother/sister`, `uncle/aunt`, `captain/doctor` using scene context and `BOOK_BIBLE.md` (`kakak/adik`, `abang/mbak`, `om/tante`, `kapten/dokter`).
+- **SFX, vocal fillers & stage cues**: never leave English sounds/fillers untranslated (`uhh/uhhh`, `uhm`, `erm`, `sniff/snif`, `sob`, `sigh`, `gasp`, `gulp`, `groan`, `hmph`, `tch`, `cough`, `pant`, `smirk`). Adapt by context into Indonesian (`emm...`/`ehm...`/`hmm...`/`anu...`, `*hiks*`/`hiks...`/`terisak`/`sesenggukan`, `hah...`/`menghela napas`, `deg`/`tersentak`, `glek`, `uhuk`, `cih`/`ck`, `terengah-engah`, `menyeringai`).
 - Keep proper nouns, ship/organization names, and glossary `keep_source` entries exact (`verify` & `scan` enforce Latin boundary integrity).
 
 ---

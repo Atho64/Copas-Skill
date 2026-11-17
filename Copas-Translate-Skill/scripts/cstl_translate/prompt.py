@@ -23,6 +23,7 @@ JP_ID_RULES = """Japanese to Indonesian localization:
 - Track who acts on whom, omitted subjects, negation, conditions, uncertainty, and viewpoint. Preserve what the speaker knows at that point; do not resolve an intentional ambiguity with invented facts.
 - Distinguish spoken politeness from intimacy, sarcasm, or social distance. Use consistent character voice while allowing evidence-based changes between addressees or scenes.
 - Render idioms, sentence particles, aizuchi, and context-sensitive greetings by their function. Do not mechanically map every そう/なるほど to one phrase or every ね/よ to one particle.
+- Strictly localize all SFX, vocal fillers, sighs, sobs, and onomatopoeia into genuine Indonesian matching context — NEVER output English comic SFX or fillers (never use uh/uhhh, uhm, erm, hng/hngh/ngh/ungh/mmph, sniff/snif, sob, sigh, gasp, gulp, groan, hmph, tch, pfft, cough, pant, smirk). Examples by context: hesitation/thinking/clearing throat -> emm..., hmm..., anu..., ehm...; muffled/straining/pain (ぐっ/くっ/んっ/hngh) -> akh!, aduh..., duh..., hup!, mmm..., mengerang tertahan; crying/sobbing -> *hiks*, hiks..., terisak, sesenggukan; runny nose/sniffing (ずずっ) -> srot..., *menarik ingus*; sigh -> hah..., menghela napas; gasp -> hah?!, deg, tersentak; gulp -> glek; scoff/click tongue -> cih, heh, ck; cough -> uhuk, terbatuk; panting -> hah... hah..., terengah-engah; heartbeat -> deg-degan, dag-dig-dug.
 - Keep established name readings and standalone surnames/given names/nicknames distinct. Do not guess a kanji name reading. Honorifics and kinship address follow the project policy and actual relationship.
 - Write natural Indonesian syntax, without adding saya/Anda, telah, adalah, oleh karena itu, or modern slang to every line. Preserve deliberate repetition, hesitation, roughness, and narrative voice.
 - Translate everyday words normally; record unresolved proper nouns or genuinely ambiguous meanings separately with line IDs and evidence, never inside the game dialogue.
@@ -30,7 +31,7 @@ JP_ID_RULES = """Japanese to Indonesian localization:
 
 JP_ID_REVIEW_RULES = """Japanese to Indonesian review:
 - Check meaning first: subject/object, negation, modality, missing clauses, relationships, perspective, and knowledge at this point in the scene.
-- Then read the Indonesian for idiom, collocation, pronoun/register drift, and character voice. Recheck each rewrite against Japanese; a wording preference alone is not an error.
+- Then read the Indonesian for idiom, collocation, pronoun/register drift, character voice, and unlocalized English SFX/fillers (replace uh/uhhh, snif/sniff, sob, sigh, gasp, gulp, hmph, tch, etc. with natural Indonesian like emm/ehm/hmm, hiks/sesenggukan, hah, glek, cih/ck according to context). Recheck each rewrite against Japanese; a wording preference alone is not an error.
 - Preserve confirmed decisions and accepted semantic fixes. Give each correction a short reason citing source text or line IDs; do not silently resolve an uncertainty or rewrite sound dialogue.
 """
 
@@ -38,13 +39,14 @@ EN_ID_RULES = """English to Indonesian localization:
 - Choose pronouns, kinship terms (kakak/adik/abang/mbak/pak/bu), and register per speaker-addressee relationship; never default everything to saya/Anda or aku/kamu.
 - Avoid English structural calques: do not spam tense auxiliaries (telah/sudah/sedang/akan), passive di-... oleh when active or bare-verb Indonesian flows better, nominalization chains, or excessive "yang" clauses.
 - Translate idioms, phrasal verbs, tag questions, and sarcasm by communicative intent rather than word-for-word glosses.
+- Strictly localize all English SFX, vocal fillers, and stage/sound cues into natural Indonesian matching context — NEVER keep uh/uhhh, uhm, erm, sniff/snif, sob, sigh, gasp, gulp, groan, hmph, tch, cough, pant, smirk (use emm/ehm/hmm/anu, *hiks*/terisak/sesenggukan, hah.../menghela napas, deg/tersentak, glek, uhuk, cih/ck, terengah-engah instead).
 - Keep glossary names/terms exact, preserve capitalization-based proper nouns per policy, and check gender/number/addressee from scene context.
 - Keep spoken VN dialogue natural and concise; distinguish internal monologue from narration.
 """
 
 EN_ID_REVIEW_RULES = """English to Indonesian review:
 - Check meaning accuracy first: idioms/phrasal verbs, negation/rhetorical reversals, comparatives, pronoun/antecedent reference, dropped modifiers or clauses.
-- Then check natural Indonesian phrasing: remove translationese (passive/nominalization/telah-adalah bloat, unnatural yang-stacking, stiff spoken dialogue) without altering facts or character voice.
+- Then check natural Indonesian phrasing: remove translationese (passive/nominalization/telah-adalah bloat, unnatural yang-stacking, stiff spoken dialogue) and replace any leftover English SFX/vocal fillers (uh/uhhh, snif/sniff, sigh, gasp, gulp, hmph, tch, etc.) with natural Indonesian (emm/ehm/hmm, hiks/sesenggukan, hah, glek, cih/ck) without altering facts or character voice.
 - Preserve confirmed glossary terms, redlines, and accepted fixes. Cite English source evidence when reporting A/C issues.
 """
 
@@ -221,6 +223,8 @@ def project_prompt_info(data: dict, task: str = "translate", line_count=None) ->
         instruction += "\n\nHelper input/output contract:\n" + OUTPUT_CONTRACTS[task]
         instruction += "\nIn the supplied packet, lines.message is the original text, lines.trans_message is the existing translation, and name/trans_name are separate speaker fields. Apply the saved prompt's task and style rules using this helper contract for input fields and output serialization. Context and other saved prompts do not add output rows."
         instruction += "\nWhen present, project_brief supplements the saved task prompt with project facts, character/addressee voice, and confirmed decisions. Explicit user directions take priority; otherwise retain the saved prompt and glossary when a supplement conflicts. Use cited file/line/route scopes and keep uncertainties unresolved."
+        if task in ("translate", "agent", "ai-check") and langpair.lang_code(tl or "Indonesian") == "id":
+            instruction += "\nLocalize all SFX, vocal fillers, sighs, and sobs into natural Indonesian matching context (e.g. emm/ehm/hmm/anu, akh/aduh/hup/mmm, *hiks*/sesenggukan, srot..., hah..., deg/tersentak, glek, uhuk, cih/ck); never leave English comic SFX/fillers (uh/uhhh, uhm, erm, hng/hngh/mmph, snif/sniff, sob, sigh, gasp, gulp, groan, hmph, tch, cough, pant, smirk) in Indonesian text."
     return {
         "task": task,
         "prompt_field": field,

@@ -37,7 +37,7 @@ HAN = re.compile(r"[\u4e00-\u9fff]")
 JP_TERM = re.compile(r"[\u3400-\u9fff]{2,8}|[\u30a0-\u30ff]{2,10}")
 NEVER = re.compile(r"(?!x)x")
 
-DEFAULT_SOFT_BLOCK_LATIN = ["kana_residue", "kanji_residue", "jp_punct", "space_before_punct", "odd_quotes"]
+DEFAULT_SOFT_BLOCK_LATIN = ["kana_residue", "kanji_residue", "jp_punct", "space_before_punct", "odd_quotes", "english_sfx_residue"]
 DEFAULT_SOFT_BLOCK_CJK = ["jp_punct", "odd_quotes"]
 DEFAULT_LEAK_FILES = ["DEFECT_TAXONOMY.md", "AI_FLAVOR_CHECKLIST.md", "EXAMPLES.md"]
 

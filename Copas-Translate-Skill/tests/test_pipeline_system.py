@@ -85,9 +85,21 @@ class PipelineSystemTests(unittest.TestCase):
         self.assertIn("jp_punct", langpair.soft_checks("おはよう。", "Pagi。", "Japanese", "Indonesian"))
         self.assertIn("register_mix", langpair.soft_checks("なんだ", "Saya tidak tahu lo mau apa.", "Japanese", "Indonesian"))
         self.assertIn("english_residue", langpair.soft_checks("You are here with that.", "You are here with that.", "English", "Indonesian"))
+        self.assertIn("english_sfx_residue", langpair.soft_checks("うーん…", "Uhhh... tunggu.", "Japanese", "Indonesian"))
+        self.assertIn("english_sfx_residue", langpair.soft_checks("くすん…", "*snif* Aku tidak kuat...", "Japanese", "Indonesian"))
+        self.assertIn("english_sfx_residue", langpair.soft_checks("ぐっ！", "Hngh... berat sekali.", "Japanese", "Indonesian"))
+        self.assertIn("english_sfx_residue", langpair.soft_checks("んっ", "Hng... *mmph*", "Japanese", "Indonesian"))
+        self.assertIn("english_sfx_residue", langpair.soft_checks("ぐっ！", "*urgh* Ouch! *shiver* *blush*", "Japanese", "Indonesian"))
+        self.assertIn("english_sfx_residue", langpair.soft_checks("バタン", "*slam* *thud* Whoa, yikes!", "Japanese", "Indonesian"))
+        self.assertIn("english_sfx_residue", langpair.soft_checks("*sniff*", "*sniff* Jangan pergi.", "English", "Indonesian"))
+        self.assertNotIn("english_sfx_residue", langpair.soft_checks("うーん…", "Emm... *hiks* Baiklah, ehm... hmm...", "Japanese", "Indonesian"))
+        self.assertNotIn("english_sfx_residue", langpair.soft_checks("ぐっ", "Akh! Aduh... Hup, srot... Mmm... Brak! Klik.", "Japanese", "Indonesian"))
+        self.assertNotIn("english_sfx_residue", langpair.soft_checks("ふん。", "Cih, uhuk! Hah...", "Japanese", "Indonesian"))
+        self.assertNotIn("english_sfx_residue", langpair.soft_checks("<i>", "<cough>Halo {uhh} dunia.", "Japanese", "Indonesian"))
 
         p_en_id = prompt.build_prompt("batch", "English", "Indonesian")
         self.assertIn("English to Indonesian localization", p_en_id)
+        self.assertIn("hiks", p_en_id)
         p_jp_en = prompt.build_prompt("batch", "Japanese", "English")
         self.assertIn("Japanese to English localization", p_jp_en)
 
@@ -392,6 +404,27 @@ class PipelineSystemTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual(why, "E_reverts_fix")
+
+        # Mechanical review gate blocks introducing English comic SFX, allows fixing existing ones
+        ok_add_sfx, why_add_sfx, _, _ = review.check(
+            {"id": "g1-998", "line_num": 3, "category": "C", "offending": "Berjalan ke gedung sekolah lama.",
+             "proposed": "*snif* Berjalan ke gedung sekolah lama."},
+            {"line_num": 3, "name": None, "message": "旧校舎へ歩いた。", "trans_name": None,
+             "trans_message": "Berjalan ke gedung sekolah lama."},
+            rules,
+        )
+        self.assertFalse(ok_add_sfx)
+        self.assertEqual(why_add_sfx, "soft:english_sfx_residue")
+
+        ok_fix_sfx, _, fixed_sfx, _ = review.check(
+            {"id": "g1-997", "line_num": 3, "category": "B", "offending": "Uhhh... *snif*",
+             "proposed": "Emm... *hiks*"},
+            {"line_num": 3, "name": None, "message": "うー…くすん…", "trans_name": None,
+             "trans_message": "Uhhh... *snif* Aku sedih."},
+            rules,
+        )
+        self.assertTrue(ok_fix_sfx)
+        self.assertEqual(fixed_sfx, "Emm... *hiks* Aku sedih.")
 
         # 5. merge + pick for C finding g1-002
         self.run_cli("review", "merge", self.project, "g1")

@@ -34,7 +34,7 @@ Store shared rules in `<work>/review/config.json` (root shared across `--run` pa
   "settled": ["gedung sekolah lama"],
   "glossary_settled": true,
   "forbid": "[\\u3001\\u3002\\uff01\\uff1f\\u3000]",
-  "soft_block": ["kana_residue", "kanji_residue", "jp_punct", "space_before_punct", "odd_quotes"],
+  "soft_block": ["kana_residue", "kanji_residue", "jp_punct", "space_before_punct", "odd_quotes", "english_sfx_residue"],
   "leak_files": ["EXAMPLES.md"]
 }
 ```

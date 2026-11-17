@@ -33,6 +33,7 @@ Broken, ungrammatical, or non-idiomatic target text even without looking at the 
 | Broken English grammar / tense flip | `ja-en` | Mid-narration jump from past to present without scene shift |
 | Missing syntactic argument | all | Incomplete clause (`Dia berlari ke lantai bawah sistem...` missing verb/preposition) |
 | Leaked kana/kanji or JP punctuation | `ja-id` / `ja-en` | `。`, `、`, `！`, stray `っ`, `ー`, or untranslated kanji in Latin output |
+| English comic/vocal SFX residue | `ja-id` / `en-id` | `Uhhh...`, `Hngh!`/`Hng...`, `*snif*`/`*sniff*`, `*sigh*`, `*gasp*`, `hmph`, `tch` → `Emm...`/`Hmm...`, `Akh!`/`Aduh...`/`Hup!`/`Mmm...`, `*hiks*`/`srot...`, `hah...`, `deg`, `cih`/`ck` |
 
 ---
 

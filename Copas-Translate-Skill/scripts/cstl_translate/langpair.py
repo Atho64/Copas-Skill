@@ -36,6 +36,22 @@ ENGLISH_FUNCTION = {"the", "and", "of", "you", "is", "are", "was", "were", "with
                     "have", "what", "your", "for", "not", "but", "they", "there", "would"}
 ID_FORMAL = {"anda", "saya"}
 ID_SLANG = {"gue", "gua", "gw", "lo", "lu", "elo", "elu"}
+# English comic/VN SFX and vocal fillers that should be localized to Indonesian (never block tags via _TOKEN stripping)
+ID_ENGLISH_SFX = re.compile(
+    r"\b(?:"
+    r"uh+|uhm+|umm+|erm+|ugh+|ergh+|urgh+|a+rgh+|agh+|ack+|u+ngh+|h+n+g+h*|n+g+h+|m+p+h+|"
+    r"ouch+|oomph+|ow{2,}|eww+|yikes+|whoa+|woah+|sheesh+|j+eez+|g+eez+|"
+    r"snif+|sniffl(?:e|es|ed|ing)|snorts?|"
+    r"sigh(?:s|ed|ing)?|gasps?|groans?|grunts?|gulps?|sobs?|sobbed|sobbing|pants?|"
+    r"smirks?|snickers?|chuckles?|giggles?|whimpers?|shrieks?|squeaks?|yelps?|yawns?|coughs?|sneezes?|hiccups?|"
+    r"mumbles?|murmurs?|mutters?|whines?|growls?|huffs?|wheezes?|thumps?|throbs?|ba-?dumps?|"
+    r"blush(?:es|ed|ing)?|pouts?|frowns?|scowls?|glares?|stares?|winces?|flinches?|shudders?|shivers?|shrugs?|nods?|"
+    r"thuds?|thwacks?|smacks?|whacks?|slams?|crashes?|splashes?|swoosh(?:es)?|whoosh(?:es)?|"
+    r"clatters?|rattles?|creaks?|rustles?|clanks?|clinks?|screech(?:es)?|splats?|clicks?|"
+    r"pff+t*|humph+|hmph+|tch+|tsk+|phew+|whew+|eek+|eep+|bleh+|shh+|shush+|sweatdrops?"
+    r")\b",
+    re.I,
+)
 
 _TOKEN = re.compile(r"<[^<>\r\n]*>|\{[^{}\r\n]+\}|%[-+#0-9.]*[A-Za-z%]|\\[A-Za-z]+(?:\[[^\]\r\n]*\])?|\\.")
 
@@ -96,6 +112,8 @@ def soft_checks(src: str, tgt: str, source_lang, target_lang) -> list[str]:
             out.append("register_mix")
         if sc == "en" and len(words & ENGLISH_FUNCTION) >= 3:
             out.append("english_residue")
+        if ID_ENGLISH_SFX.search(_TOKEN.sub(" ", t)):
+            out.append("english_sfx_residue")
     ratio = LENGTH_RATIO.get(key)
     if ratio and len(vs) >= ratio[0] and vt:
         r = len(vt) / max(1, len(vs))
