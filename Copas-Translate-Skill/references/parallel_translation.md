@@ -42,23 +42,23 @@ Settle recurring new speakers, places, or coined terms into `work/glossary.locke
 - Writes `work/par/_stage.json`, `grp_<N>_src.json`, and `grp_<N>_ctx.json` (`context_before` + `context_after` drawn from the full project, including neighboring files!).
 - To target specific files or resume only remaining work, add `--file scene01.json ...` or `--range A-B`.
 
-### 3. Build `STYLE_GUIDE.md` & `BOOK_BIBLE.md` (Recommended)
+### 3. Build `STYLE_GUIDE.md` & `CATATAN_CERITA.md` (Recommended)
 - Generate `work/STYLE_GUIDE.md` from `references/style_guide_template.md`, anchoring rules on the user-approved sample batch.
 - If part of the VN is already translated, extract precedents mechanically:
   ```bash
-  <PFX> -m cstl_translate.precedents work/project.copas --for work/par/grp_*_src.json --locked work/glossary.locked.json --out work/BOOK_BIBLE.md
+  <PFX> -m cstl_translate.precedents work/project.copas --for work/par/grp_*_src.json --locked work/glossary.locked.json --out work/CATATAN_CERITA.md
   ```
-- For brand-new VNs with complex casts/relationships, fill `references/book_bible_template.md` (especially §2 Pairwise Pronoun Matrix and §5 Policy Decisions).
+- For brand-new VNs with complex casts/relationships, fill `references/catatan_cerita_template.md` (especially §2 Pairwise Pronoun Matrix and §5 Policy Decisions).
 
 ### 4. Generate Read-Once Group Bundles (Token Saver)
 ```bash
-<PFX> -m cstl_translate.batch bundle work/project.copas work/par/grp_*_src.json --locked work/glossary.locked.json --include work/STYLE_GUIDE.md work/BOOK_BIBLE.md
+<PFX> -m cstl_translate.batch bundle work/project.copas work/par/grp_*_src.json --locked work/glossary.locked.json --include work/STYLE_GUIDE.md work/CATATAN_CERITA.md
 ```
 Each `work/par/bundle_<N>.md` packs into **one file**:
 - Delivery contract (`trans_<N>.jsonl` + `newterms_<N>.txt` paths & exact schema)
 - `state card` (settled decisions, source errata, token exceptions, protected meaning fixes)
 - Resolved active project prompt (`prompt_header`)
-- `STYLE_GUIDE.md` / `BOOK_BIBLE.md` / `user_prompt.md`
+- `STYLE_GUIDE.md` / `CATATAN_CERITA.md` / `user_prompt.md`
 - **Filtered group glossary TSV** (only characters & terms appearing in group `N`)
 - `context_before` & `context_after` (read-only) + `Assigned Lines (JSONL)`
 

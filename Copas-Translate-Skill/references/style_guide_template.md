@@ -10,7 +10,7 @@ Copy this to `<WORK>/STYLE_GUIDE.md` and lock in project specifics (derived from
 - **Pair profile**: `references/language_pairs.md#{{pairKey}}` (primary default `ja-id`; also `en-id`, `ja-en`).
 - **Narration**: smooth, natural literary prose; avoid translationese (`telah`, `adalah`, passive `di-... oleh`, excessive `yang` chains for Indonesian; stiff calques / tense flips for English).
 - **Dialogue**: natural spoken rhythm matching each character's personality, age, and social distance.
-- **Pronoun policy**: follow the pairwise matrix in `BOOK_BIBLE.md` §2 (never collapse all speakers into one `aku/kamu` or `saya/Anda`; omit pronouns when Indonesian reads naturally without them).
+- **Pronoun policy**: follow the pairwise matrix in `CATATAN_CERITA.md` §2 (never collapse all speakers into one `aku/kamu` or `saya/Anda`; omit pronouns when Indonesian reads naturally without them).
 
 ## 2. Quotation, Punctuation & Typography
 - **Dialogue quotes**: choose ONE and keep across all files — standard `"..."` (nested `'...'`) **OR** Japanese `「...」` (`『...』`) if `kagikakko` is enabled. Never double-wrap dialogue that already has a speaker tag.

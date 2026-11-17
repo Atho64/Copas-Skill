@@ -1,12 +1,12 @@
-# BOOK_BIBLE Template (Pre-Translation / Pre-Review Fact Sheet)
+# CATATAN_CERITA Template (Pre-Translation / Pre-Review Fact Sheet)
 
-Before launching parallel batches (or full adversarial review), have 1–2 fast agents scan representative files (or run `precedents` if part of the project is already translated) to lock down **facts** in `<WORK>/BOOK_BIBLE.md`. Wrong facts cause systematic cross-file mistranslations (wrong gender, wrong kinship term, shifting rank/honorifics, wrong pronoun register).
+Before launching parallel batches (or full adversarial review), have 1–2 fast agents scan representative files (or run `precedents` if part of the project is already translated) to lock down **facts** in `<WORK>/CATATAN_CERITA.md`. Wrong facts cause systematic cross-file mistranslations (wrong gender, wrong kinship term, shifting rank/honorifics, wrong pronoun register).
 
 Only record facts directly supported by source evidence (with `file` + `line_num`). Put guesses under **Needs Confirmation**.
 
 ---
 
-# Book Bible — {{projectName}} ({{source_lang}} -> {{target_lang}})
+# Catatan Cerita — {{projectName}} ({{source_lang}} -> {{target_lang}})
 
 ## 1. Characters
 | Source Name | Reading / Render | Gender | Role / Rank | Speech Quirks | Evidence (file #line_num) |

@@ -7,7 +7,7 @@ Primary focus: **Japanese → Indonesian (`ja-id`)**, with dedicated rules for *
 ## `#ja-id` Japanese → Indonesian (Primary)
 
 ### 1. Pronouns & Address Matrix (Speaker × Addressee)
-Never impose one global `aku/kamu` or `saya/Anda` pair. Track each speaker-addressee pair in `BOOK_BIBLE.md`:
+Never impose one global `aku/kamu` or `saya/Anda` pair. Track each speaker-addressee pair in `CATATAN_CERITA.md`:
 - **Zero-pronoun preference**: omit subjects/objects when Indonesian reads naturally without them (`食べる？` → `"Mau makan?"`, not `"Apakah kamu mau makan?"`).
 - **Intimate / peers / family**: `aku / kamu` or `aku / kau` (or `aku / [nama]` / kinship `Kak`, `Bang`, `Dik`). Reserve `gue / lo` strictly for modern/rough characters whose setting calls for it.
 - **Polite / seniors / workplace / strangers**: `saya / Anda` only for truly stiff/official distance; more often `saya / Pak|Bu|Kak|Mbak|Mas|[nama]-san` or role titles.
@@ -27,7 +27,7 @@ Translate **communicative function**, not dictionary glosses:
 - `お邪魔します` / `いただきます` / `お疲れ様`: localize naturally by situation (*"Permisi"`, *"Selamat makan"`, *"Kerja bagus hari ini"* / *"Terima kasih kerja kerasnya"*).
 
 ### 4. Names, Honorifics & Onomatopoeia
-- **Hepburn & standalone forms**: keep surname, given name, and nickname distinct in `glossary.locked.json` (`Hayakawa Mugi`, `Hayakawa`, `Mugi`, `Mucchan`). Never guess ambiguous kanji readings; flag unresolved names in `BOOK_BIBLE.md` / `needs_review`.
+- **Hepburn & standalone forms**: keep surname, given name, and nickname distinct in `glossary.locked.json` (`Hayakawa Mugi`, `Hayakawa`, `Mugi`, `Mucchan`). Never guess ambiguous kanji readings; flag unresolved names in `CATATAN_CERITA.md` / `needs_review`.
 - **Honorifics**: follow project policy (keep `-san/-kun/-chan/-sama/-senpai/-sensei` OR localize to Indonesian kinship/titles `Kak/Pak/Bu/Guru`). Never mix both policies within the same relationship.
 - **Onomatopoeia & SFX (giongo/gitaigo & vocal fillers)**: localize strictly into vivid, genuine Indonesian verbs, adverbs, or native Indonesian vocal cues matching scene emotion/context. **Never** leave raw katakana or import English comic SFX / fillers (`uh/uhh/uhhh`, `uhm`, `erm`, `hng/hngh/ngh/ungh/mmph`, `sniff/snif/sniffle`, `sob`, `sigh`, `gasp`, `gulp`, `groan`, `grunt`, `hmph`, `tch`, `tsk`, `pfft`, `cough`, `pant`, `smirk`, `sweatdrop`, `eek`, `ugh`, `ergh`):
   - **Hesitation / thinking / clearing throat (`えっと`, `うーん`, `うー`, `uhhh`, `uhm`, `erm`)**: `emm...`, `hmm...`, `anu...` (ragu/berpikir), `ehm...` (berdeham), `eh...` / `lho...` (bingung).
@@ -62,7 +62,7 @@ Translate **communicative function**, not dictionary glosses:
 
 ### 3. Idioms, Phrasal Verbs & Pronouns
 - Translate idioms and phrasal verbs by intent (`turned on her heel` → `langsung berbalik`, `rule out` → `mengesampingkan`, `So?` → `Memangnya kenapa?`).
-- Disambiguate `you`, `brother/sister`, `uncle/aunt`, `captain/doctor` using scene context and `BOOK_BIBLE.md` (`kakak/adik`, `abang/mbak`, `om/tante`, `kapten/dokter`).
+- Disambiguate `you`, `brother/sister`, `uncle/aunt`, `captain/doctor` using scene context and `CATATAN_CERITA.md` (`kakak/adik`, `abang/mbak`, `om/tante`, `kapten/dokter`).
 - **SFX, vocal fillers & stage cues**: never leave English sounds/fillers untranslated (`uhh/uhhh`, `uhm`, `erm`, `sniff/snif`, `sob`, `sigh`, `gasp`, `gulp`, `groan`, `hmph`, `tch`, `cough`, `pant`, `smirk`). Adapt by context into Indonesian (`emm...`/`ehm...`/`hmm...`/`anu...`, `*hiks*`/`hiks...`/`terisak`/`sesenggukan`, `hah...`/`menghela napas`, `deg`/`tersentak`, `glek`, `uhuk`, `cih`/`ck`, `terengah-engah`, `menyeringai`).
 - Keep proper nouns, ship/organization names, and glossary `keep_source` entries exact (`verify` & `scan` enforce Latin boundary integrity).
 

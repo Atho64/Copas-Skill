@@ -9,7 +9,7 @@ Saved prompts inside `.copas`/`.copas.zip` govern the matching task (`prompt_hea
 ## Core Localization Principles
 
 1. **Faithful and complete**: preserve meaning, emotional intensity, speaker perspective, omissions/ambiguity, and plot boundaries (never leak future facts from `context_after`). Do not censor, summarize, or drop clauses.
-2. **Spoken dialogue vs narration**: dialogue must sound like real spoken language tailored to speaker × addressee (`BOOK_BIBLE.md`); narration and internal monologue must read naturally in the target language.
+2. **Spoken dialogue vs narration**: dialogue must sound like real spoken language tailored to speaker × addressee (`CATATAN_CERITA.md`); narration and internal monologue must read naturally in the target language.
 3. **Language-pair craft** (see [language_pairs.md](language_pairs.md) for concrete rules & examples):
    - **`ja-id` (Primary — Japanese → Indonesian)**: dynamic pronoun/address selection per relationship, zero-pronoun omission when natural, accurate omitted-subject/directionality (`-てあげる/-てもらう/-てくれる`), functional rendering of aizuchi/particles (`なるほど`, `ね/よ`), natural Indonesian syntax without `telah/adalah/yang` bloat, genuine Indonesian onomatopoeia/SFX by context (never English comic SFX like `uhhh`, `snif/sniff`, `sigh`, `gasp`, `hmph`, `tch`), distinct standalone surname/given-name/nickname renderings.
    - **`en-id` (English → Indonesian)**: restrain `telah/sedang/akan` tense spam, rewrite passive/nominalization/existential calques into active natural Indonesian, disambiguate `you` and kinship terms from context, translate idioms by intent, localize all English SFX/vocal fillers (`uhhh` → `emm/ehm/hmm`, `sniff` → `hiks/sesenggukan`, `sigh` → `hah/menghela napas`) into natural Indonesian.

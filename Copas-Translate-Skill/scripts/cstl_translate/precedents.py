@@ -1,4 +1,4 @@
-"""Precedent sheet (BOOK_BIBLE.md) extracted from already-translated lines.
+"""Precedent sheet (CATATAN_CERITA.md) extracted from already-translated lines.
 
 For every speaker name, character, and recurring JP/EN term occurring in the
 pending groups' source lines, report how already-translated lines rendered it.
@@ -34,7 +34,7 @@ def _glossary_index(locked: dict | None) -> dict[str, tuple[str, str, str]]:
     return gl
 
 
-def build(lines: list[dict], pending_rows: list[dict], locked: dict | None = None, title: str = "BOOK_BIBLE") -> str:
+def build(lines: list[dict], pending_rows: list[dict], locked: dict | None = None, title: str = "CATATAN_CERITA") -> str:
     done = [ln for ln in lines if not ln.get("_hidden") and ln.get("is_translated") and (ln.get("trans_message") or "").strip()]
     gl = _glossary_index(locked)
     vocab = _proper_noun_vocab(lines)
@@ -110,12 +110,12 @@ def build(lines: list[dict], pending_rows: list[dict], locked: dict | None = Non
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Build BOOK_BIBLE precedent sheet from translated lines")
+    ap = argparse.ArgumentParser(description="Build CATATAN_CERITA precedent sheet from translated lines")
     ap.add_argument("cstl_path")
     ap.add_argument("--for", dest="sources", nargs="+", required=True, metavar="SRC_JSON")
     ap.add_argument("--locked", help="Locked glossary JSON")
     ap.add_argument("--out", help="Write Markdown here (default stdout)")
-    ap.add_argument("--title", default="BOOK_BIBLE")
+    ap.add_argument("--title", default="CATATAN_CERITA")
     a = ap.parse_args(argv)
 
     data = ensure_cstl(load_cstl(a.cstl_path))

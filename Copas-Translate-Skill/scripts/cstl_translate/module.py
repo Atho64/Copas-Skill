@@ -66,7 +66,7 @@ def load_module(name: str, work: str) -> dict:
         "translate_prompt.md": "user_prompt.md",
         "polish_prompt.md": "polish_prompt.md",
         "style.md": "STYLE_GUIDE.md",
-        "book_bible.md": "BOOK_BIBLE.md",
+        "catatan_cerita.md": "CATATAN_CERITA.md",
     }
     copied = []
     for src_fn, dst_fn in mapping.items():
@@ -114,7 +114,7 @@ def main(argv=None):
             raise SystemExit(f"module not found: {a.name}")
         meta = json.loads((d / "meta.json").read_text(encoding="utf-8")) if (d / "meta.json").exists() else {}
         print(json.dumps(meta, ensure_ascii=False, indent=2))
-        for fn in ("glossary.locked.json", "translate_prompt.md", "polish_prompt.md", "style.md", "book_bible.md"):
+        for fn in ("glossary.locked.json", "translate_prompt.md", "polish_prompt.md", "style.md", "catatan_cerita.md"):
             p = d / fn
             print(f"\n--- {fn} {'(exists)' if p.exists() else '(missing)'} ---")
             if p.exists():

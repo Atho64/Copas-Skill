@@ -48,7 +48,7 @@ Store shared rules in `<work>/review/config.json` (root shared across `--run` pa
 `<PFX>` = `PYTHONPATH="$CT_SKILL/scripts" "$CSTL_PY"`, `<REV>` = `work/review` (use `--run <name>` for subsequent passes so files stay isolated under `work/review/<name>/`):
 
 ```bash
-# 0. Pre-check project decisions & settle book-wide policies (BOOK_BIBLE.md §5)
+# 0. Pre-check project decisions & settle book-wide policies (CATATAN_CERITA.md §5)
 <PFX> -m cstl_translate.state card work/project.copas --range 1-1000
 
 # 1. Split translated lines into balanced ~140-line review groups

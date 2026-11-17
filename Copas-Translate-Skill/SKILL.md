@@ -90,7 +90,7 @@ Whenever corrections are written via `batch apply --source <label> --reason "...
 
 ---
 
-## 4. Glossary, `BOOK_BIBLE` & `STYLE_GUIDE`
+## 4. Glossary, `CATATAN_CERITA` & `STYLE_GUIDE`
 
 1. **Seed & extract**:
    - **From VNDB** (official character names, readings, aliases, roles, gender, non-spoiler notes):
@@ -114,14 +114,14 @@ Whenever corrections are written via `batch apply --source <label> --reason "...
    ```bash
    <PFX> -m cstl_translate.scan work/project.copas --locked work/glossary.locked.json --mode pending
    ```
-3. **Facts & style**: fill [references/book_bible_template.md](references/book_bible_template.md) (especially the pairwise Pronoun & Address Matrix for `ja-id` / `en-id`) and [references/style_guide_template.md](references/style_guide_template.md). If resuming a partially translated project, generate `work/BOOK_BIBLE.md` automatically via `precedents`.
+3. **Facts & style**: fill [references/catatan_cerita_template.md](references/catatan_cerita_template.md) (especially the pairwise Pronoun & Address Matrix for `ja-id` / `en-id`) and [references/style_guide_template.md](references/style_guide_template.md). If resuming a partially translated project, generate `work/CATATAN_CERITA.md` automatically via `precedents`.
 
 ---
 
 ## 5. Intervention Modes & Translation Loop
 
 Confirm the user's mode before mass translation:
-- **Mode A (Sample-then-Auto, default)**: translate one sample scene (~50–100 lines), confirm voice/pronouns/honorifics/quotes with the user, then proceed automatically (pausing only on ambiguous new entities).
+- **Mode A (Sample-then-Auto, default)**: translate an opening sample (up to ~1000 lines / opening chapter for full VNs so the main cast appears, or ~100–200 lines for shorter works; summarize the pronoun matrix and representative dialogue per character for sign-off instead of dumping all raw lines), confirm voice/pronouns/honorifics/quotes with the user, then proceed automatically (pausing only on ambiguous new entities).
 - **Mode B (Every-Batch Review)**: show each batch for sign-off before write-back.
 - **Mode C (Fully Auto)**: translate end-to-end, logging uncertain out-of-glossary names to `needs_review` for final summary.
 
@@ -138,7 +138,7 @@ Confirm the user's mode before mass translation:
 See [references/parallel_translation.md](references/parallel_translation.md). Summary:
 ```bash
 <PFX> -m cstl_translate.batch split work/project.copas --target 250 --out-dir work/par --context 20
-<PFX> -m cstl_translate.batch bundle work/project.copas work/par/grp_*_src.json --locked work/glossary.locked.json --include work/STYLE_GUIDE.md work/BOOK_BIBLE.md
+<PFX> -m cstl_translate.batch bundle work/project.copas work/par/grp_*_src.json --locked work/glossary.locked.json --include work/STYLE_GUIDE.md work/CATATAN_CERITA.md
 # Workers read ONE bundle_N.md and write ONE trans_N.jsonl + newterms_N.txt (never touching project.copas)
 <PFX> -m cstl_translate.batch validate work/par/grp_1_src.json work/par/trans_1.jsonl --project work/project.copas
 <PFX> -m cstl_translate.glossary merge-newterms --locked work/glossary.locked.json work/par/newterms_*.txt --apply --inject work/project.copas
@@ -212,7 +212,7 @@ To eliminate subtle mistranslations (`誰が誰に`, modality, flipped negation,
 | `module` | `create` · `list` · `show` · `load --work` |
 | `glossary` | `vndb` · `from-project` · `from-text` · `extract` · `inject` · `filter` · `lint` · `merge-newterms` |
 | `vndb` | `[project] [--vn ID \| --query TITLE] [--search] [--out] [--cast-out] [--merge] [--inject] [--matched-only]` |
-| `precedents` | `<project> --for grp_*_src.json [--locked] --out BOOK_BIBLE.md` |
+| `precedents` | `<project> --for grp_*_src.json [--locked] --out CATATAN_CERITA.md` |
 | `batch` | `read` · `read-translated` · `split` · `bundle` · `validate` · `write` · `apply` |
 | `polish` | `write <project> <files...> [--expect-batch] [--force] [--allow-tag-mismatch]` |
 | `verify` | `<project> [locked] [--baseline] [--write-baseline] [--json] [--out]` |

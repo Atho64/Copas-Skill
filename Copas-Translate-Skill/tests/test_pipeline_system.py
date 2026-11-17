@@ -305,12 +305,13 @@ class PipelineSystemTests(unittest.TestCase):
         pend_toks = {r["token"] for r in pending_res["pending"]}
         self.assertTrue({"生徒会", "スピカ"} <= pend_toks)
 
-        # precedents builds BOOK_BIBLE from translated lines
+        # precedents builds CATATAN_CERITA from translated lines
         md = precedents.build(
             cstl_io.load_cstl(str(self.project))["lines"],
             [{"line_num": 3, "name": "スピカ", "message": "生徒会と旧校舎。"}],
             json.loads(locked_path.read_text(encoding="utf-8")),
         )
+        self.assertIn("# CATATAN_CERITA", md)
         self.assertIn("スピカ", md)
         self.assertIn("gedung sekolah lama", md)
 

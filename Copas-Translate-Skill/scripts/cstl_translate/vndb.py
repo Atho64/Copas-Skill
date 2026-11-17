@@ -597,7 +597,7 @@ def _existing_owner_set(locked: dict) -> set[str]:
 
 
 def format_cast_markdown(vn_meta: dict | None, records: list[dict], include_spoilers: bool = False) -> str:
-    """Render a clean Markdown character & VN reference sheet for `BOOK_BIBLE.md`."""
+    """Render a clean Markdown character & VN reference sheet for `CATATAN_CERITA.md`."""
     lines: list[str] = []
     if vn_meta:
         vid = vn_meta.get("id") or ""

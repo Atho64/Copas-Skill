@@ -68,7 +68,7 @@ Handled primarily by the **Consistency Auditor** from `inventory.json`:
 - Same term translated multiple ways (`旧校舎` → `gedung lama` / `bangunan tua`).
 - Same character `name` mapped to different `trans_name` variants (`speaker_drift`).
 - Repeated verbatim catchphrases or system lines (`callbacks`) translated inconsistently.
-- **Legitimate variation (do NOT report)**: context-dependent shifts recorded in `BOOK_BIBLE.md` / `redline` (e.g., Mugi speaking differently to a teacher vs his childhood friend).
+- **Legitimate variation (do NOT report)**: context-dependent shifts recorded in `CATATAN_CERITA.md` / `redline` (e.g., Mugi speaking differently to a teacher vs his childhood friend).
 
 ---
 

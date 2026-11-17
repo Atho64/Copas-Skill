@@ -1,6 +1,6 @@
 # Hand-off to Copas-Translate-Skill
 
-Copas-Reverse-Skill produces `id_input/*.json` and consumes `id_output/*.json`. Everything between — glossary, `BOOK_BIBLE` / `STYLE_GUIDE`, state/provenance, batch/parallel translation, mechanical QA, adversarial review — belongs to **Copas-Translate-Skill**. This page is the exact hand-off.
+Copas-Reverse-Skill produces `id_input/*.json` and consumes `id_output/*.json`. Everything between — glossary, `CATATAN_CERITA` / `STYLE_GUIDE`, state/provenance, batch/parallel translation, mechanical QA, adversarial review — belongs to **Copas-Translate-Skill**. This page is the exact hand-off.
 
 ## Layout assumptions
 
@@ -46,8 +46,8 @@ $CT -m cstl_translate.batch read "$WORK/project.copas" --size 100 > "$WORK/batch
 $CT -m cstl_translate.batch write "$WORK/project.copas" "$WORK/translations_001.json" --expect-batch "$WORK/batch_001.json"
 # Parallel (after Mode A sample style confirmation):
 $CT -m cstl_translate.batch split "$WORK/project.copas" --target 250 --out-dir "$WORK/par" --context 20
-$CT -m cstl_translate.precedents "$WORK/project.copas" --for "$WORK/par"/grp_*_src.json --locked "$WORK/glossary.locked.json" --out "$WORK/BOOK_BIBLE.md"
-$CT -m cstl_translate.batch bundle "$WORK/project.copas" "$WORK/par"/grp_*_src.json --locked "$WORK/glossary.locked.json" --include "$WORK/STYLE_GUIDE.md" "$WORK/BOOK_BIBLE.md"
+$CT -m cstl_translate.precedents "$WORK/project.copas" --for "$WORK/par"/grp_*_src.json --locked "$WORK/glossary.locked.json" --out "$WORK/CATATAN_CERITA.md"
+$CT -m cstl_translate.batch bundle "$WORK/project.copas" "$WORK/par"/grp_*_src.json --locked "$WORK/glossary.locked.json" --include "$WORK/STYLE_GUIDE.md" "$WORK/CATATAN_CERITA.md"
 # ... workers write trans_N.jsonl + newterms_N.txt; coordinator validates & writes serially ...
 $CT -m cstl_translate.batch validate "$WORK/par/grp_1_src.json" "$WORK/par/trans_1.jsonl" --project "$WORK/project.copas"
 $CT -m cstl_translate.glossary merge-newterms --locked "$WORK/glossary.locked.json" "$WORK/par"/newterms_*.txt --apply --inject "$WORK/project.copas"
