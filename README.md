@@ -19,7 +19,7 @@ Localization rules (pronoun/register matrix, native Indonesian SFX/onomatopoeia,
 
 ```text
 Pakai skill Copas-Translate-Skill untuk menerjemahkan "[path/ke/project.copas]" dari awal sampai selesai ([Jepang -> Indonesia], VNDB: "[vXXXX atau judul VN]").
-Ambil cast dari VNDB (`glossary vndb`), siapkan `glossary.locked.json` + `CATATAN_CERITA.md` + `STYLE_GUIDE.md`, kerjakan 1000 baris awal dulu dan tampilkan ringkasan gaya/sapaan + contoh dialognya untuk ACC (Mode A), lalu setelah di-ACC selesaikan sisanya sampai lolos QA (`verify`, `scan`, `audit`) dan Adversarial Review (`review --mode slim`), tampilkan `review_ALL.md` untuk saya `pick` dulu sebelum diekspor ke `.zip` berisi `.copas` saja (`export --format copas-zip`).
+Ambil cast dari VNDB (`glossary vndb`), siapkan `glossary.locked.json` + `CATATAN_CERITA.md` + `STYLE_GUIDE.md`, kerjakan 1000 baris awal dulu dan tampilkan ringkasan gaya/sapaan + contoh dialognya untuk ACC (Mode A), lalu setelah di-ACC selesaikan sisanya sampai lolos QA (`verify`, `scan`, `audit`), jalankan `polish` (`--stage polish`) dulu lalu Adversarial Review (`review --mode slim`), tampilkan `review_ALL.md` untuk saya `pick` dulu sebelum diekspor ke `.zip` berisi `.copas` saja (`export --format copas-zip`).
 ```
 
 Development checks (run inside a skill folder that has `tests/`):
