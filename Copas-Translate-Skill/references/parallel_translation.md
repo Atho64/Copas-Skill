@@ -1,139 +1,113 @@
-# Parallel Translation (large VN acceleration)
+# Parallel Translation & Polish (Large VN Acceleration)
 
-Use this workflow when the user chooses parallel translation: **multiple subagents translate different file ranges concurrently**.
+Use this workflow when translating or polishing large VNs concurrently across independent file groups. Every orchestration step uses deterministic CLI commands (`scan --mode pending`, `batch split`, `glossary filter`, `batch bundle`, `precedents`, `batch validate`, `glossary merge-newterms`, `batch write`, `progress`) — no ad-hoc temporary Python heredocs.
 
-**Placeholders**: `<PFX>` = `PYTHONPATH="$SKILL_DIR/scripts" "$CSTL_PY"`; `<WORK>` = work dir (e.g. `~/my-vn`).
+**Placeholders**: `<PFX>` = `PYTHONPATH="$CT_SKILL/scripts" "$CSTL_PY"`, `<WORK>` = project work dir containing `project.copas` (or `project.copas.zip`).
 
-## When to use
+---
 
-- Large VN (hundreds+ lines) with many independent files/batches.
-- **Style is settled** from saved project prompts and the confirmed glossary. Use a sample when those choices are unresolved, respecting the user's chosen interaction mode.
-- Locked glossary and the saved project prompt are ready. `work/user_prompt.md` and the style guide supplement those project choices unless the user requested an override.
+## When to Use
 
-## Iron rule: subagents never write project.copas
+- Large project (hundreds+ lines) with settled style.
+- **Style settled first**: translate one opening sample (~1 chapter/scene) using Intervention Mode A and get user sign-off on register, pronouns, honorifics, and quotation style before launching parallel workers.
+- Locked glossary (`work/glossary.locked.json`) and saved project prompts are ready.
 
-`batch write` does read-modify-write of `project.copas`. Concurrent writes → corruption.
+## Iron Rule: Subagents Never Touch `project.copas`
 
-```
-✗ each subagent batch write to same project.copas  — race, will corrupt
-✓ subagents only produce translation JSONs; main agent serially writes back — safe
-```
-
-**Architecture:**
+`batch write` / `polish write` / `batch apply` perform locked read-modify-write of `project.copas`. Parallel workers only write their assigned `trans_<N>.jsonl` (or `polished_<N>.jsonl`) + `newterms_<N>.txt`. The coordinator validates and writes serially.
 
 ```
-main: split batches → extract per-group prompt/context packets → write STYLE_GUIDE.md
-  ├─ agent1 (files A-B)  read glossary+rules+style+input → produce trans_1.json + newterms_1.txt
-  ├─ agent2 (files C-D)  … (concurrent, no shared writes)
-  └─ agentN …
-main: validate outputs → normalize drift → serial batch write each → merge new terms → verify → export
+Coordinator: scan --mode pending -> batch split -> precedents -> batch bundle
+  ├─ worker 1  reads ONE file (bundle_1.md) -> writes ONCE (trans_1.jsonl + newterms_1.txt)
+  ├─ worker 2  reads ONE file (bundle_2.md) -> writes ONCE (trans_2.jsonl + newterms_2.txt)
+  └─ worker N  ...
+Coordinator: batch validate -> retry failures -> merge-newterms (check CONFLICT) -> batch write -> verify + scan + audit
 ```
 
-## Steps
+---
 
-### 1. Split (consecutive files in project order, balanced by untranslated count)
+## Step-by-Step Pipeline
 
-```python
-# <PFX> python - <<'PY' — enumerate files + untranslated counts
-from cstl_translate.cstl_io import load_cstl
-d=load_cstl('work/project.copas')
-lines=d.get('lines',[])
-from collections import Counter
-cnt=Counter(l['file'] for l in lines if not l.get('is_translated') and not l.get('_hidden') and (l.get('message') or '').strip())
-for f,n in cnt.most_common(): print(f"{f}: {n}")
-# Group consecutive files in file_order into ~200-300 untranslated lines per group
-# PY
-```
-
-Choose concurrency within the environment's available agent slots, with roughly 200–300 lines per group. More groups than concurrency → dispatch in waves (`wait` then next wave).
-
-### 2. Extract per-group task packets (untranslated lines plus reference context)
-
-```python
-import json
-from pathlib import Path
-from cstl_translate.cstl_io import load_cstl
-from cstl_translate.batch import read_context_batch
-d=load_cstl('work/project.copas')
-lines=d['lines']
-groups={1:["scene01.json","scene02.json"], 2:["scene03.json"]}  # replace with consecutive file groups
-for g, files in groups.items():
-    count=sum(1 for l in lines if l["file"] in files and not l.get("is_translated")
-              and not l.get("_hidden") and (l.get("message") or "").strip())
-    if not count:
-        continue
-    packet=read_context_batch('work/project.copas', size=count, files=files)
-    Path(f'/tmp/cstl_grp_{g}_src.json').write_text(
-        json.dumps(packet, ensure_ascii=False, indent=1), encoding='utf-8')
-```
-
-Each packet includes the active saved translation `instruction`, all saved `prompts`, glossary, languages, `currentBackground`, `context_type`, and separate `context_before`, `lines`, and `context_after` arrays. Context uses saved `context_lines` and `context_lines_after` and comes from the full project, including neighboring files outside the worker's assignment. Following context defaults to zero if the project has not enabled it; use `before=N, after=N` only for a requested override.
-
-For a large file, create smaller packets with `files=[filename], size=100, offset=N`; offsets count eligible untranslated lines within those files. The CLI equivalent is `batch read ... --file scene01.json --file scene02.json --size 100 --offset N`. Only packet `lines` belongs to the worker. Never translate its context arrays.
-
-Extract all disjoint packets for a concurrent wave before writing translations. Offsets are relative to that snapshot's untranslated lines; after write-back, recompute them, or read the next remaining batch with offset zero.
-
-Re-extract packets for later waves after earlier workers have written back. Concurrent neighbors may still have untranslated context; use the available source evidence and do not invent a previous worker's translation or a story summary. The packet's summary is the one saved in the project.
-
-### 3. Write STYLE_GUIDE.md
-
-Use `references/style_guide_template.md` to produce `<WORK>/work/STYLE_GUIDE.md` (quotes, spacing, name/term handling, dates). All agents must read it.
-
-### 4. Dispatch subagents concurrently (one Tool call per agent, same message)
-
-Each prompt must be self-contained (see template below). Key points:
-- Read `STYLE_GUIDE.md` + `glossary.locked.json` + `translation_rules.md`.
-- Read own `/tmp/cstl_grp_N_src.json`, follow its active `instruction`, and use before/after context according to `context_type` (source text, existing translation, or both). Translate only `lines` **1:1** (`line_num` unchanged, count unchanged, order unchanged).
-- Produce `/tmp/cstl_trans_N.json` via a **Python builder script** (avoid hand-written JSON escaping; use `json.dump(ensure_ascii=False)`).
-- Write kept-as-source new names to `/tmp/cstl_newterms_N.txt` (one per line).
-- **Do not** touch `project.copas` or run `batch write`.
-
-### 5. Validate outputs
-
-```python
-for g in groups:
-    src=json.load(open(f'/tmp/cstl_grp_{g}_src.json', encoding='utf-8'))['lines']
-    tr=json.load(open(f'/tmp/cstl_trans_{g}.json', encoding='utf-8'))
-    assert [x['line_num'] for x in src]==[x['line_num'] for x in tr]
-    assert all(x.get('trans_message','').strip() for x in tr)
-```
-
-If a group fails (count/mismatch, empty translations) → **re-dispatch only that agent** with the validation error + 1:1 emphasis.
-
-### 6. Normalize drift (three common drifts)
-
-| Drift | Detect | Fix |
-|-------|--------|-----|
-| Quote style 「」 vs "" | count `「` per group | normalize to project's chosen style |
-| Name/term/title inconsistency | spot-check key characters | rewrite against saved project prompt + glossary and confirmed style supplements |
-| New names transliterated per-agent | look at newterms | unify to keep-source, update glossary once |
-
-### 7. Serial write-back + finish
-
+### 1. Discover New Pending Terms Before Splitting
 ```bash
-for g in 1 2 3 4 5 6 7; do
-  <PFX> -m cstl_translate.batch write "$WORK/work/project.copas" /tmp/cstl_trans_$g.json --expect-batch /tmp/cstl_grp_${g}_src.json
-done
+<PFX> -m cstl_translate.scan work/project.copas --locked work/glossary.locked.json --mode pending
+```
+Settle recurring new speakers, places, or coined terms into `work/glossary.locked.json` (and `glossary inject`) before splitting so parallel workers don't invent conflicting spellings.
+
+### 2. Split Into File-Aligned Groups
+```bash
+<PFX> -m cstl_translate.batch split work/project.copas --target 250 --out-dir work/par --context 20
+```
+- Groups consecutive files in `file_order` around `--target` lines (splitting huge files evenly, folding tiny tails).
+- Writes `work/par/_stage.json`, `grp_<N>_src.json`, and `grp_<N>_ctx.json` (`context_before` + `context_after` drawn from the full project, including neighboring files!).
+- To target specific files or resume only remaining work, add `--file scene01.json ...` or `--range A-B`.
+
+### 3. Build `STYLE_GUIDE.md` & `BOOK_BIBLE.md` (Recommended)
+- Generate `work/STYLE_GUIDE.md` from `references/style_guide_template.md`, anchoring rules on the user-approved sample batch.
+- If part of the VN is already translated, extract precedents mechanically:
+  ```bash
+  <PFX> -m cstl_translate.precedents work/project.copas --for work/par/grp_*_src.json --locked work/glossary.locked.json --out work/BOOK_BIBLE.md
+  ```
+- For brand-new VNs with complex casts/relationships, fill `references/book_bible_template.md` (especially §2 Pairwise Pronoun Matrix and §5 Policy Decisions).
+
+### 4. Generate Read-Once Group Bundles (Token Saver)
+```bash
+<PFX> -m cstl_translate.batch bundle work/project.copas work/par/grp_*_src.json --locked work/glossary.locked.json --include work/STYLE_GUIDE.md work/BOOK_BIBLE.md
+```
+Each `work/par/bundle_<N>.md` packs into **one file**:
+- Delivery contract (`trans_<N>.jsonl` + `newterms_<N>.txt` paths & exact schema)
+- `state card` (settled decisions, source errata, token exceptions, protected meaning fixes)
+- Resolved active project prompt (`prompt_header`)
+- `STYLE_GUIDE.md` / `BOOK_BIBLE.md` / `user_prompt.md`
+- **Filtered group glossary TSV** (only characters & terms appearing in group `N`)
+- `context_before` & `context_after` (read-only) + `Assigned Lines (JSONL)`
+
+### 5. Monitor Live Progress (Optional)
+```bash
+<PFX> -m cstl_translate.progress work/project.copas --once
+<PFX> -m cstl_translate.progress work/project.copas --watch
+<PFX> -m cstl_translate.progress work/project.copas --serve 8765 --open
 ```
 
-Then: merge `cstl_newterms_*` into glossary (default `keep_source`), `verify`, fix, `export`.
+### 6. Dispatch Workers (Rolling Waves of ~4–6 Agents)
+Send identical system instructions first (maximizes prompt caching) and have each worker **read `bundle_<N>.md` once and write `trans_<N>.jsonl` (+ `newterms_<N>.txt`) once**:
 
-Completion criterion: default `batch read` has an empty `lines` array (`[]` with `--lines-only`). Hidden/empty untranslated lines can remain in status and should be reported separately.
+> You are a literary VN translator for group `{N}` ({COUNT} lines).
+> Read `<WORK>/par/bundle_{N}.md` once, along with `$CT_SKILL/references/language_pairs.md#<PAIR>`.
+> Follow the `## Delivery (write once)` section in `bundle_{N}.md`: write ALL {COUNT} JSONL lines to `<WORK>/par/trans_{N}.jsonl` and out-of-glossary proper nouns/terms to `<WORK>/par/newterms_{N}.txt`.
+> Hard rules: 1:1 `line_num`, exact order, non-empty `trans_name` iff source `name` is non-empty, keep tags/placeholders/`\n`/trailing spaces verbatim, follow `STYLE_GUIDE.md` and the filtered glossary, never touch `project.copas` or run `batch write`.
+> Return only: translated line count, newterms count, and up to 5 uncertain lines (`line_num` + note).
 
-## Subagent prompt template (fill {N}/{FILES}/{COUNT})
+### 7. Validate Each Group & Merge New Terms
+```bash
+<PFX> -m cstl_translate.batch validate work/par/grp_1_src.json work/par/trans_1.jsonl --project work/project.copas
+```
+- If `validate` reports hard errors (`missing_index`, `extra_index`, `duplicate_index`, `speaker_missing`, `structural_tokens`, etc.), re-dispatch **only that group** with the error list.
+- Preview cross-worker new-term conflicts BEFORE writing back:
+  ```bash
+  <PFX> -m cstl_translate.glossary merge-newterms --locked work/glossary.locked.json work/par/newterms_*.txt
+  ```
+  If `CONFLICT` appears (two workers rendered the same new term differently), unify the `trans_*.jsonl` files first, then run with `--apply --inject work/project.copas`.
 
-> You are a literary VN translator for {COUNT} lines from files {FILES}. Apply the saved project style and confirmed user supplements consistently across all assigned lines.
->
-> Step 1 — Read: `<WORK>/work/STYLE_GUIDE.md`, `<WORK>/work/glossary.locked.json`, `<WORK>/work/user_prompt.md` (if exists), `$SKILL_DIR/references/translation_rules.md`.
->
-> Step 2 — Read `/tmp/cstl_grp_{N}_src.json`, a task packet with {COUNT} assigned `lines`. Follow its active `instruction` and saved glossary. Use `context_before`, `context_after`, reference languages, and `currentBackground` only as evidence; follow `context_type` when choosing source/translated context. Following context happens later in the story.
->
-> Step 3 — Translate only packet `lines` to the saved target language. Hard rules: names/terms per locked glossary; unknown proper nouns → keep source; honorifics/style per saved project prompt and confirmed user supplements; tags/placeholders verbatim; OCR merges (e.g. `Marlowstepped`) → restore boundary; **1:1** — never merge/split/drop. Context rows must not appear in the output.
->
-> Step 4 — Write a Python builder `/tmp/cstl_build_{N}.py`: define `T={line_num:"translation"}` + `TN={line_num:"name"}` for every assigned input, load packet `lines`, build `[{"line_num":i,"trans_message":T[i],"trans_name":TN.get(i)}]` in that order, assert no missing, `json.dump` to `/tmp/cstl_trans_{N}.json` (`ensure_ascii=False`). Run it and print count + 0 missing (=={COUNT}).
->
-> Step 5 — Write kept-as-source new proper nouns to `/tmp/cstl_newterms_{N}.txt` (one per line; empty if none).
->
-> Constraints: **do not** modify `project.copas` or glossary files; **do not** run `batch write` or any `cstl_translate` command; only produce those two /tmp files. Translate fully, do not summarize or skip.
->
-> Return: count translated, 0-missing confirmation (=={COUNT}), new keep-source list.
+### 8. Serial Write-Back + Mechanical QA Loop
+```bash
+<PFX> -m cstl_translate.batch write work/project.copas work/par/trans_*.jsonl
+<PFX> -m cstl_translate.glossary lint --locked work/glossary.locked.json
+<PFX> -m cstl_translate.verify work/project.copas work/glossary.locked.json
+<PFX> -m cstl_translate.scan work/project.copas --locked work/glossary.locked.json --mode all
+<PFX> -m cstl_translate.audit work/project.copas --out work/audit.json
+```
+Run this QA loop at the end of **every wave** when translating in waves so newly settled terms feed into subsequent waves immediately.
+
+---
+
+## Parallel Polish Pass
+
+Run the same pipeline with `--stage polish`:
+```bash
+<PFX> -m cstl_translate.batch split work/project.copas --stage polish --target 250 --out-dir work/par --context 15
+<PFX> -m cstl_translate.batch bundle work/project.copas work/par/grp_*_src.json --stage polish --locked work/glossary.locked.json --include work/polish_prompt.md work/STYLE_GUIDE.md
+# ... workers write work/par/polished_N.jsonl (`{"line_num": N, "polished_text": "...", "polished_name": ...}`) ...
+<PFX> -m cstl_translate.batch validate work/par/grp_1_src.json work/par/polished_1.jsonl --project work/project.copas
+<PFX> -m cstl_translate.polish write work/project.copas work/par/polished_*.jsonl
+```

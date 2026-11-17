@@ -41,7 +41,7 @@ class CompatibilityTests(unittest.TestCase):
             "lines": [
                 {"line_num": 4, "file": "later.json", "name": None, "message": "後で。", "is_translated": False},
                 {"line_num": 1, "file": "opening.json", "name": "麦", "message": "先に。", "trans_message": "Duluan.", "trans_name": "Mugi", "is_translated": True},
-                {"line_num": 2, "file": "opening.json", "name": "Nino, Shin'ichirō", "message": "こんにちは。  ", "is_translated": False,
+                {"line_num": 2, "file": "opening.json", "name": "Nino, Shin'ichirō", "message": "こんにちは。<br>{0}  ", "is_translated": False,
                  "ref_lang_1": "Hello.  ", "ref_lang_1_name": "Nino, Shin'ichirō", "custom_index": {"scene_index": 8, "text_index": 0},
                  "_ai_checked": True, "future_line_field": {"keep": True}},
                 {"line_num": 3, "file": "opening.json", "name": None, "message": "風。", "is_translated": False},
@@ -95,7 +95,7 @@ class CompatibilityTests(unittest.TestCase):
         line = next(line for line in saved["lines"] if line["line_num"] == 2)
         self.assertEqual(line["trans_message"], "Halo.\\n{0}  ")
         self.assertEqual(line["trans_name"], "Nino, Shin'ichirō")
-        self.assertEqual(line["message"], "こんにちは。  ")
+        self.assertEqual(line["message"], "こんにちは。<br>{0}  ")
         self.assertEqual(line["custom_index"], {"scene_index": 8, "text_index": 0})
         self.assertTrue(line["_ai_checked"])
         self.assertEqual(line["future_line_field"], {"keep": True})

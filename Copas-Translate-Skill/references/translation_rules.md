@@ -1,46 +1,37 @@
-# Translation rules
+# Translation Rules
 
-The agent follows **CSTL's native translation philosophy** plus the pipeline's hard requirement of line-faithful 1:1 mapping.
-Specific name/term renderings live in the project's confirmed glossary (`glossary.locked.json` and `glossary_text` in the `.copas` backup). Apply the saved prompt for the active task: translation `prompt_header`, glossary `glossary_prompt`, review `ai_check_prompt`, or agent `agent_prompt`. The packet's `instruction` resolves language/count variables and adds the helper serialization contract. Other prompt fields are available for reference and must not be mixed into the active task.
+The coding agent acts as the translation engine, applying **CopasTool's localization philosophy**, the **language-pair profile** ([language_pairs.md](language_pairs.md)), confirmed **`decisions.json`** (`state card`), and the **locked glossary**, while obeying strict 1:1 structural alignment.
 
-**Language-agnostic**: supports any source/target language. Saved project prompts determine punctuation, quotation style, honorifics, and register; explicit user instructions can override them. Local prompt/style files supplement those choices rather than silently replacing the saved prompt with a default.
-
----
-
-## CSTL Native Translation Principles
-
-You are a professional visual novel translator translating `{source_language}` → `{target_language}`:
-
-- **Translate line-for-line, never merge/split**: output count == input count, `line_num` 1:1, order unchanged.
-- **Preserve all markers verbatim**: `<i>`, `<b>`, `{0}`, `%s`, `\n` / `<br>` / `\\n`, `…` placeholders, code fragments. EPUB rendering depends on them.
-- **Faithful and accurate**: the work is an artistic whole — do not arbitrarily delete, soften, or censor. Keep the original meaning/plot intact.
-- **Character tone & perspective**: keep each speaker's register, emotional intensity, and POV. Monologue — restore omitted subject/object only when needed for natural target language.
-- **Glossary is truth**: `characters[].render` / `terms[].dst` is the only authority. `keep_source:true` means leave as source. Same name → same rendering everywhere.
-
-Use the source and surrounding scene to resolve omitted subjects, pronouns, tense, speaker perspective, and relationships. Reference-language text can help disambiguate, but the original source remains the text being translated. Make dialogue match the speaker's register; keep narration smooth without turning internal monologue into attributed dialogue.
+Saved prompts inside `.copas`/`.copas.zip` govern the matching task (`prompt_header` for translation, `glossary_prompt` for glossary, `ai_check_prompt` for review/polish, `agent_prompt` for agent mode). Language-pair rules fill in when the saved prompt is blank or when generating new templates.
 
 ---
 
-## Pipeline Hard Requirements
+## Core Localization Principles
 
-- **Strict 1:1 alignment**: input is the default `batch read` packet's `lines` array; output is the same-length `{line_num, trans_message, trans_name}` array. `line_num` values, order, and count must match exactly. `--lines-only` retains the legacy input array when explicitly needed.
-- **Speaker handling**: if input `name` is non-null → output `trans_name` with translated name. If `name` is null → omit/null `trans_name`. Never invent or drop a speaker.
-- **Names are data, not punctuation**: determine whether a speaker exists from the input `name` field, not by splitting dialogue or names on punctuation. Preserve apostrophes inside names (`'` and `’`) and provide `trans_name` for every non-empty source name.
-- **Grouped names**: multiple speakers or descriptive names can contain commas and ampersands (`&`/`＆`), including forms such as `Nino & Menoa` or `??? & ???`. Preserve the whole name field and its mapping instead of splitting it into translation rows.
-- **Copied app formats**: when numbered dialogue tags are enabled, repeat the input's `[D]`/`[N]` tag. With `use_dialogue_tags:false`, return `N. Name: dialogue` or `N. narration` without tags. Omit `[File: ...]` labels in either mode. The helper JSON schema does not use these tags. Read [copastool_workflows.md](copastool_workflows.md) for the app's format contracts.
-- **Context is reference-only**: translate only the task packet's `lines`. Preceding/following context, references, glossary, and rolling summaries do not add output rows. Following context happens later; do not give a character knowledge they have not acquired yet.
-- **Tags/placeholders**: keep unchanged in place (`<i>`, `<b>`, `{0}`, `\n`). Do not strip or reposition them arbitrarily.
-- **Spacing**: preserve meaningful trailing spaces and engine newline conventions. Use JSON strings to retain spaces that copied text may trim.
-- **Terminology**: use locked glossary; for entries not in glossary, default to **keep source** and record in `needs_review`.
-- **Standalone names**: use separate glossary renderings for independently used family/given names and nicknames; do not replace every short name with a full name. Honorific and quotation choices follow the project prompt.
-- **OCR artefacts**: occasional merged tokens (multiple words without space, e.g. `centralavenue`). Restore word boundaries, translate, and flag the line for review.
+1. **Faithful and complete**: preserve meaning, emotional intensity, speaker perspective, omissions/ambiguity, and plot boundaries (never leak future facts from `context_after`). Do not censor, summarize, or drop clauses.
+2. **Spoken dialogue vs narration**: dialogue must sound like real spoken language tailored to speaker × addressee (`BOOK_BIBLE.md`); narration and internal monologue must read naturally in the target language.
+3. **Language-pair craft** (see [language_pairs.md](language_pairs.md) for concrete rules & examples):
+   - **`ja-id` (Primary — Japanese → Indonesian)**: dynamic pronoun/address selection per relationship, zero-pronoun omission when natural, accurate omitted-subject/directionality (`-てあげる/-てもらう/-てくれる`), functional rendering of aizuchi/particles (`なるほど`, `ね/よ`), natural Indonesian syntax without `telah/adalah/yang` bloat, localized onomatopoeia, distinct standalone surname/given-name/nickname renderings.
+   - **`en-id` (English → Indonesian)**: restrain `telah/sedang/akan` tense spam, rewrite passive/nominalization/existential calques into active natural Indonesian, disambiguate `you` and kinship terms from context, translate idioms by intent.
+   - **`ja-en` (Japanese → English)**: restore omitted subjects cleanly without repeating names, match speaker register with natural English diction/contractions, follow consistent narrative tense and honorific policy, naturalize aizuchi/onomatopoeia.
+4. **Glossary is truth**: `characters[].render` and `terms[].dst` are the single source of truth; `keep_source: true` stays verbatim. Unknown proper nouns stay verbatim (Hepburn for Japanese unless established spelling applies) and are recorded for review.
 
 ---
 
-## Pre-write Checklist
+## Pipeline Hard Requirements (Enforced by `integrity`, `audit`, `batch validate/write`)
 
-- [ ] Output length == input length, `line_num` values match, order unchanged
-- [ ] `batch write --expect-batch` accepts the saved batch; no context rows or changed speaker types
-- [ ] All tags / placeholders / `\n` preserved
-- [ ] Terms use `terms[].dst` (`keep_source:true` → kept); names use `characters[].render`
-- [ ] No clause dropped (compare against source for each line)
+- **Strict 1:1 alignment**: `line_num`, line count, and order must match the batch `lines` array identically. Never merge, split, or drop lines.
+- **Speaker handling**: non-empty source `name` requires non-empty `trans_name`; narration (`name: null`) must keep `trans_name: null`. Never invent or drop speakers. Keep grouped speakers (`Nino & Menoa`, `Nino, Menoa & Ichito`, `??? & ???`) as one single `trans_name`.
+- **Context is read-only**: `context_before`, `context_after`, `ref_lang_1/2`, `currentBackground`, and `glossary` provide evidence only and must never add output rows.
+- **Tags, placeholders & whitespace**: preserve `<i>`, `<b>`, `{0}`, `%s`, `\n`, `<br>`, `[ruby]`, and meaningful trailing spaces verbatim unless a specific `token-exception` is registered in `state`.
+- **App copied formats**: when operating through CopasTool's clipboard formats (`numbered` with/without `[D]/[N]`, `block`, `xml`, `jsonl`, `jsonarray`), follow [copastool_workflows.md](copastool_workflows.md).
+
+---
+
+## Pre-Write Checklist
+
+- [ ] Output count == input count, `line_num` and order identical
+- [ ] `trans_name` non-empty iff source `name` non-empty
+- [ ] All markup tags, placeholders, `\n`, and trailing spaces preserved
+- [ ] Glossary characters/terms and `state` settled decisions applied consistently
+- [ ] Zero leaked kana/kanji/Japanese punctuation (for Latin targets) and no dropped clauses

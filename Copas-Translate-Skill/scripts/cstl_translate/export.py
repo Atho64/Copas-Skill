@@ -1,8 +1,9 @@
-"""Export a CopasTool project backup back to JSON / EPUB / Luca TXT on disk."""
+"""Export a CopasTool project backup to a .copas-only ZIP or JSON / EPUB / Luca TXT."""
 from __future__ import annotations
 
 import argparse
 import base64
+from datetime import datetime
 import io
 import json
 import os
@@ -11,6 +12,54 @@ import zipfile
 from pathlib import Path
 
 from .cstl_io import ensure_cstl, load_cstl
+
+_BACKUP_SUFFIXES = (".copas.zip", ".cstl.zip", ".copas", ".cstl", ".zip")
+
+
+def _safe_filename(raw: str, fallback: str = "project") -> str:
+    cleaned = re.sub(r'[<>:"/\\|?*]+', "_", (raw or "")).strip(" .")
+    return cleaned or fallback
+
+
+def _strip_backup_suffix(path: str) -> str:
+    name = os.path.basename(path)
+    lower = name.lower()
+    for suf in _BACKUP_SUFFIXES:
+        if lower.endswith(suf):
+            return name[: -len(suf)]
+    return Path(name).stem
+
+
+def export_copas_zip(cstl_path: str, out_dir: str, name: str | None = None) -> list[str]:
+    """Package the `.copas` backup alone inside `<out_dir>/<name>.zip`."""
+    data = ensure_cstl(load_cstl(cstl_path))
+    data["updatedAt"] = int(datetime.now().timestamp() * 1000)
+
+    if name:
+        base = _safe_filename(name)
+    else:
+        stem = _strip_backup_suffix(cstl_path)
+        pname = str(data.get("projectName") or "").strip()
+        if stem.lower() in ("", "project", "backup", "imported") and pname and pname.lower() != "untitled":
+            base = _safe_filename(pname)
+        else:
+            base = _safe_filename(stem)
+
+    os.makedirs(out_dir, exist_ok=True)
+    zip_path = os.path.join(out_dir, f"{base}.zip")
+    tmp_path = f"{zip_path}.tmp.{os.getpid()}"
+    payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
+    try:
+        with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(f"{base}.copas", payload)
+        os.replace(tmp_path, zip_path)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+    return [zip_path]
 
 
 def export_json(cstl_path: str, out_dir: str) -> list[str]:
@@ -235,10 +284,11 @@ def export_luca(cstl_path: str, out_dir: str) -> list[str]:
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Export CopasTool project backup to JSON/EPUB/Luca")
+    ap = argparse.ArgumentParser(description="Export CopasTool project backup to .copas ZIP or JSON/EPUB/Luca")
     ap.add_argument("--cstl", required=True)
     ap.add_argument("--output", required=True)
-    ap.add_argument("--format", dest="fmt", choices=["json", "epub", "luca", "auto"], default="auto")
+    ap.add_argument("--format", dest="fmt", choices=["copas-zip", "copas", "json", "epub", "luca", "auto"], default="auto")
+    ap.add_argument("--name", default=None, help="Output base name for copas-zip (<name>.zip containing <name>.copas)")
     ap.add_argument("--epub-source", default=None, help="Original EPUB file if not embedded")
     a = ap.parse_args(argv)
     fmt = a.fmt
@@ -246,7 +296,9 @@ def main(argv=None):
         d = ensure_cstl(load_cstl(a.cstl))
         pt = d.get("projectType") or "json"
         fmt = "json" if pt == "json" else pt
-    if fmt == "json":
+    if fmt in ("copas-zip", "copas"):
+        out = export_copas_zip(a.cstl, a.output, name=a.name)
+    elif fmt == "json":
         out = export_json(a.cstl, a.output)
     elif fmt == "epub":
         out = export_epub(a.cstl, a.output, epub_source_path=a.epub_source)

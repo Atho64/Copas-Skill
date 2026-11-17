@@ -447,12 +447,16 @@ def main(argv=None):
         import shutil
         if not os.path.exists(a.input):
             ap.error(f"input not found: {a.input}")
-        input_is_zip = a.input.lower().endswith((".copas.zip", ".cstl.zip"))
+        input_is_copas_zip = a.input.lower().endswith((".copas.zip", ".cstl.zip"))
+        input_is_wrapped_zip = not input_is_copas_zip and a.input.lower().endswith(".zip") and is_project_backup_path(a.input)
         output_is_zip = a.out.lower().endswith((".copas.zip", ".cstl.zip"))
-        if input_is_zip != output_is_zip:
-            ap.error("keep the backup container type in --out (.copas/.cstl or .copas.zip/.cstl.zip)")
         os.makedirs(os.path.dirname(os.path.abspath(a.out)) or ".", exist_ok=True)
-        shutil.copy2(a.input, a.out)
+        if input_is_wrapped_zip:
+            save_cstl(a.out, ensure_cstl(load_cstl(a.input)))
+        else:
+            if input_is_copas_zip != output_is_zip:
+                ap.error("keep the backup container type in --out (.copas/.cstl or .copas.zip/.cstl.zip)")
+            shutil.copy2(a.input, a.out)
         s = load_cstl(a.out)
         total = len(s.get("lines", []))
         trans = sum(1 for l in s.get("lines", []) if l.get("is_translated"))

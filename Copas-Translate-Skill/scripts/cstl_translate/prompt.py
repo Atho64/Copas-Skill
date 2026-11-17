@@ -1,10 +1,11 @@
-"""Manage per-project user prompts (user_prompt.md / polish_prompt.md)."""
+"""Manage per-project user prompts (user_prompt.md / polish_prompt.md) and language-pair profiles."""
 from __future__ import annotations
 
 import argparse
 import os
 from pathlib import Path
 
+from . import langpair
 from .cstl_io import ensure_cstl, load_cstl
 
 LOCALIZATION_RULES = """Translate visual novel text from {{sourceLang}} to {{targetLang}}.
@@ -16,6 +17,63 @@ LOCALIZATION_RULES = """Translate visual novel text from {{sourceLang}} to {{tar
 - Keep every input line number, its order, and its dialogue/narration identity. Never merge, split, add, or drop lines.
 - Use preceding/following context, reference-language text, and story summaries only as evidence. Translate only the requested lines.
 """
+
+JP_ID_RULES = """Japanese to Indonesian localization:
+- Choose pronouns and forms of address per speaker, addressee, relationship, and scene. Do not impose one global aku/kamu or saya/Anda pair. Omit a pronoun when Indonesian reads naturally without one; Japanese 私/僕/俺 alone does not settle the Indonesian register.
+- Track who acts on whom, omitted subjects, negation, conditions, uncertainty, and viewpoint. Preserve what the speaker knows at that point; do not resolve an intentional ambiguity with invented facts.
+- Distinguish spoken politeness from intimacy, sarcasm, or social distance. Use consistent character voice while allowing evidence-based changes between addressees or scenes.
+- Render idioms, sentence particles, aizuchi, and context-sensitive greetings by their function. Do not mechanically map every そう/なるほど to one phrase or every ね/よ to one particle.
+- Keep established name readings and standalone surnames/given names/nicknames distinct. Do not guess a kanji name reading. Honorifics and kinship address follow the project policy and actual relationship.
+- Write natural Indonesian syntax, without adding saya/Anda, telah, adalah, oleh karena itu, or modern slang to every line. Preserve deliberate repetition, hesitation, roughness, and narrative voice.
+- Translate everyday words normally; record unresolved proper nouns or genuinely ambiguous meanings separately with line IDs and evidence, never inside the game dialogue.
+"""
+
+JP_ID_REVIEW_RULES = """Japanese to Indonesian review:
+- Check meaning first: subject/object, negation, modality, missing clauses, relationships, perspective, and knowledge at this point in the scene.
+- Then read the Indonesian for idiom, collocation, pronoun/register drift, and character voice. Recheck each rewrite against Japanese; a wording preference alone is not an error.
+- Preserve confirmed decisions and accepted semantic fixes. Give each correction a short reason citing source text or line IDs; do not silently resolve an uncertainty or rewrite sound dialogue.
+"""
+
+EN_ID_RULES = """English to Indonesian localization:
+- Choose pronouns, kinship terms (kakak/adik/abang/mbak/pak/bu), and register per speaker-addressee relationship; never default everything to saya/Anda or aku/kamu.
+- Avoid English structural calques: do not spam tense auxiliaries (telah/sudah/sedang/akan), passive di-... oleh when active or bare-verb Indonesian flows better, nominalization chains, or excessive "yang" clauses.
+- Translate idioms, phrasal verbs, tag questions, and sarcasm by communicative intent rather than word-for-word glosses.
+- Keep glossary names/terms exact, preserve capitalization-based proper nouns per policy, and check gender/number/addressee from scene context.
+- Keep spoken VN dialogue natural and concise; distinguish internal monologue from narration.
+"""
+
+EN_ID_REVIEW_RULES = """English to Indonesian review:
+- Check meaning accuracy first: idioms/phrasal verbs, negation/rhetorical reversals, comparatives, pronoun/antecedent reference, dropped modifiers or clauses.
+- Then check natural Indonesian phrasing: remove translationese (passive/nominalization/telah-adalah bloat, unnatural yang-stacking, stiff spoken dialogue) without altering facts or character voice.
+- Preserve confirmed glossary terms, redlines, and accepted fixes. Cite English source evidence when reporting A/C issues.
+"""
+
+JP_EN_RULES = """Japanese to English localization:
+- Restore omitted Japanese subjects, objects, and implied referents cleanly from context without awkwardly repeating character names in adjacent clauses.
+- Match each character's voice and social register (casual, polite keigo, rough ore/washi, refined ojousama) using natural English diction and contractions rather than robotic literalism.
+- Follow the project policy for honorifics (-san/-kun/-chan/-sama/-senpai/-sensei) and Hepburn readings; keep standalone given/family names and nicknames distinct.
+- Maintain consistent narrative tense (typically past tense for VN narration unless the project brief specifies present).
+- Render aizuchi, sentence-final particles, idioms, and onomatopoeia naturally in English; avoid stiff calques ("As expected of...", "It can't be helped") when idiomatic English fits better.
+"""
+
+JP_EN_REVIEW_RULES = """Japanese to English review:
+- Check meaning first: omitted subjects/objects, te-ageru/morau/kureru directionality, passive/causative roles, negation, epistemic modality, and scene knowledge boundaries.
+- Then check English fluency and voice: remove stiff Japanese syntax calques, unnatural repetitions, tense slips, and mechanical particle/aizuchi translations.
+- Preserve locked glossary spellings, honorific policy, and confirmed fixes; cite Japanese source evidence for meaning/translationese issues.
+"""
+
+
+def is_jp_id(source_lang, target_lang) -> bool:
+    return langpair.pair_code(source_lang, target_lang) == ("ja", "id")
+
+
+def is_en_id(source_lang, target_lang) -> bool:
+    return langpair.pair_code(source_lang, target_lang) == ("en", "id")
+
+
+def is_jp_en(source_lang, target_lang) -> bool:
+    return langpair.pair_code(source_lang, target_lang) == ("ja", "en")
+
 
 FORMAT_RULES = {
     "batch": """Return a JSON array of objects with line_num, trans_message, and trans_name.
@@ -66,10 +124,32 @@ Do not add dialogue/narration type tags. [File: ...] labels identify the script 
 """
 
 
+def _pair_rules(source_lang, target_lang, task: str = "translate") -> str:
+    if task == "ai-check":
+        if is_jp_id(source_lang, target_lang):
+            return JP_ID_REVIEW_RULES
+        if is_en_id(source_lang, target_lang):
+            return EN_ID_REVIEW_RULES
+        if is_jp_en(source_lang, target_lang):
+            return JP_EN_REVIEW_RULES
+        return ""
+    if task in ("translate", "agent"):
+        if is_jp_id(source_lang, target_lang):
+            return JP_ID_RULES
+        if is_en_id(source_lang, target_lang):
+            return EN_ID_RULES
+        if is_jp_en(source_lang, target_lang):
+            return JP_EN_RULES
+    return ""
+
+
 def build_prompt(fmt: str, source_lang=None, target_lang=None, line_count=None, kagikakko=False, dialogue_tags=True) -> str:
     prompt = PROMPT_HEADERS[fmt]
     if fmt == "numbered" and not dialogue_tags:
         prompt = LOCALIZATION_RULES + "\n" + NUMBERED_UNTAGGED_RULES
+    extra = _pair_rules(source_lang, target_lang, "translate")
+    if extra:
+        prompt += "\n" + extra
     for key, value in (("sourceLang", source_lang), ("targetLang", target_lang), ("lineCount", line_count)):
         if value is not None:
             prompt = prompt.replace("{{" + key + "}}", str(value))
@@ -130,13 +210,26 @@ def project_prompt_info(data: dict, task: str = "translate", line_count=None) ->
     prompts = saved_prompts(data)
     saved = prompts[field]
     selected = saved if saved.strip() else FALLBACK_PROMPTS[task]
+    sl = data.get("source_lang")
+    tl = data.get("target_lang")
+    if not saved.strip():
+        extra = _pair_rules(sl, tl, task)
+        if extra:
+            selected += "\n" + extra
     instruction = render_variables(selected, data, line_count)
     if task in OUTPUT_CONTRACTS:
         instruction += "\n\nHelper input/output contract:\n" + OUTPUT_CONTRACTS[task]
         instruction += "\nIn the supplied packet, lines.message is the original text, lines.trans_message is the existing translation, and name/trans_name are separate speaker fields. Apply the saved prompt's task and style rules using this helper contract for input fields and output serialization. Context and other saved prompts do not add output rows."
-    return {"task": task, "prompt_field": field,
-            "prompt_source": "project" if saved.strip() else "fallback",
-            "prompts": prompts, "instruction": instruction}
+        instruction += "\nWhen present, project_brief supplements the saved task prompt with project facts, character/addressee voice, and confirmed decisions. Explicit user directions take priority; otherwise retain the saved prompt and glossary when a supplement conflicts. Use cited file/line/route scopes and keep uncertainties unresolved."
+    return {
+        "task": task,
+        "prompt_field": field,
+        "prompt_source": "project" if saved.strip() else "fallback",
+        "language_pair": langpair.pair_key(sl or "Japanese", tl or "Indonesian"),
+        "language_guide": langpair.guide_ref(sl or "Japanese", tl or "Indonesian"),
+        "prompts": prompts,
+        "instruction": instruction,
+    }
 
 
 def extract_project_prompts(project_path: str, out_dir: str, overwrite: bool = False) -> list[str]:

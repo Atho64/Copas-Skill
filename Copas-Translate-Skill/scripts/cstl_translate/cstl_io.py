@@ -22,23 +22,42 @@ import json
 import os
 import posixpath
 import zipfile
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+
+from . import helpers
+
+
+def _zip_single_copas_member(zf: zipfile.ZipFile) -> str | None:
+    members = [
+        n for n in zf.namelist()
+        if not n.endswith("/") and n.lower().endswith((".copas", ".cstl")) and ".." not in n.replace("\\", "/").split("/")
+    ]
+    return members[0] if len(members) == 1 else None
 
 
 def is_project_backup_path(path: str) -> bool:
     lower = str(path).lower()
-    return lower.endswith((".copas", ".copas.zip", ".cstl", ".cstl.zip"))
+    if lower.endswith((".copas", ".copas.zip", ".cstl", ".cstl.zip")):
+        return True
+    if lower.endswith(".zip") and os.path.isfile(path) and zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path, "r") as zf:
+            return "project.json" in zf.namelist() or _zip_single_copas_member(zf) is not None
+    return False
 
 
 def load_cstl(path: str) -> dict:
-    """Load a JSON backup or CopasTool's project.json ZIP backup."""
+    """Load a JSON backup or CopasTool ZIP backup (`project.json` or single `.copas`)."""
     if zipfile.is_zipfile(path):
         with zipfile.ZipFile(path, "r") as zf:
             try:
                 data = json.loads(zf.read("project.json").decode("utf-8-sig"))
             except KeyError as exc:
-                raise ValueError("ZIP project backup has no project.json") from exc
+                member = _zip_single_copas_member(zf)
+                if member is None:
+                    raise ValueError("ZIP project backup has no project.json") from exc
+                return json.loads(zf.read(member).decode("utf-8-sig"))
             buffers = dict(data.get("customRawBuffers") or {})
             for name in zf.namelist():
                 normalized = name.replace("\\", "/")
@@ -55,46 +74,104 @@ def load_cstl(path: str) -> dict:
 
 
 def save_cstl(path: str, data: dict) -> None:
+    """Atomic save (sibling temp file + os.replace) for JSON or ZIP backups."""
     data["updatedAt"] = int(datetime.now().timestamp() * 1000)
-    os.makedirs(os.path.dirname(os.path.abspath(path)) or ".", exist_ok=True)
-    if str(path).lower().endswith((".copas.zip", ".cstl.zip")):
-        payload = dict(data)
-        raw_files = payload.pop("customRawFiles", {}) or {}
-        raw_buffers = payload.pop("customRawBuffers", {}) or {}
-        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("project.json", json.dumps(payload, ensure_ascii=False))
-            written = set()
-            for name, content in raw_files.items():
-                rel = str(name).replace("\\", "/")
-                if not rel or rel.startswith("/") or ".." in rel.split("/"):
-                    continue
-                zf.writestr(posixpath.join("custom_sources", rel), str(content).encode("utf-8"))
-                written.add(rel)
-            for name, encoded in raw_buffers.items():
-                rel = str(name).replace("\\", "/")
-                if rel in written or not rel or rel.startswith("/") or ".." in rel.split("/"):
-                    continue
-                try:
-                    raw = base64.b64decode(str(encoded), validate=True)
-                except Exception:
-                    continue
-                zf.writestr(posixpath.join("custom_sources", rel), raw)
-        return
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-
-
-def backup_cstl(path: str) -> str | None:
-    if not os.path.exists(path):
-        return None
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    bak = f"{path}.bak.{ts}"
+    parent = os.path.dirname(os.path.abspath(path)) or "."
+    os.makedirs(parent, exist_ok=True)
+    tmp = f"{path}.tmp.{os.getpid()}"
     try:
-        with open(path, "rb") as r, open(bak, "wb") as w:
-            w.write(r.read())
-        return bak
+        if str(path).lower().endswith((".copas.zip", ".cstl.zip")):
+            payload = dict(data)
+            raw_files = payload.pop("customRawFiles", {}) or {}
+            raw_buffers = payload.pop("customRawBuffers", {}) or {}
+            with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("project.json", json.dumps(payload, ensure_ascii=False))
+                written = set()
+                for name, content in raw_files.items():
+                    rel = str(name).replace("\\", "/")
+                    if not rel or rel.startswith("/") or ".." in rel.split("/"):
+                        continue
+                    zf.writestr(posixpath.join("custom_sources", rel), str(content).encode("utf-8"))
+                    written.add(rel)
+                for name, encoded in raw_buffers.items():
+                    rel = str(name).replace("\\", "/")
+                    if rel in written or not rel or rel.startswith("/") or ".." in rel.split("/"):
+                        continue
+                    try:
+                        raw = base64.b64decode(str(encoded), validate=True)
+                    except Exception:
+                        continue
+                    zf.writestr(posixpath.join("custom_sources", rel), raw)
+        else:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
+def backup_cstl(path: str, keep: int | None = None) -> str | None:
+    return helpers.backup_file(path, keep=keep)
+
+
+@contextmanager
+def locked(cstl_path: str):
+    """Advisory lock on <cstl_path>.lock during read-modify-write."""
+    lock_path = os.path.abspath(cstl_path) + ".lock"
+    os.makedirs(os.path.dirname(lock_path) or ".", exist_ok=True)
+    try:
+        import fcntl
+        with open(lock_path, "w") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+        return
+    except ImportError:
+        pass
+    try:
+        import msvcrt
+        with open(lock_path, "a+b") as fh:
+            if os.path.getsize(lock_path) == 0:
+                fh.write(b"\0")
+                fh.flush()
+            fh.seek(0)
+            locked_ok = False
+            try:
+                msvcrt.locking(fh.fileno(), msvcrt.LK_LOCK, 1)
+                locked_ok = True
+            except OSError:
+                pass
+            try:
+                yield
+            finally:
+                if locked_ok:
+                    try:
+                        fh.seek(0)
+                        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass
+        return
+    except ImportError:
+        pass
+    yield
+
+
+def log_event(cstl_path: str, event: dict) -> None:
+    """Append a progress event to <work>/progress.jsonl."""
+    import time
+    path = os.path.join(os.path.dirname(os.path.abspath(cstl_path)), "progress.jsonl")
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": time.time(), "project": os.path.basename(cstl_path), **event},
+                               ensure_ascii=False) + "\n")
     except OSError:
-        return None
+        pass
 
 
 def ensure_cstl(data: dict) -> dict:
@@ -121,12 +198,28 @@ def ensure_cstl(data: dict) -> dict:
     return data
 
 
+def ordered_lines(data: dict) -> list[dict]:
+    order = {file: index for index, file in enumerate(data.get("file_order", []))}
+    return sorted(data.get("lines", []), key=lambda line: order.get(line.get("file"), len(order)))
+
+
+def visible_workable_lines(data: dict) -> list[dict]:
+    return [line for line in ordered_lines(data)
+            if not line.get("_hidden") and (line.get("message") or "").strip()]
+
+
 def cstl_status(path: str) -> dict:
     d = ensure_cstl(load_cstl(path))
     lines = d.get("lines", [])
     total = len(lines)
     translated = sum(1 for l in lines if l.get("is_translated"))
     untranslated = total - translated
+    hidden = sum(1 for l in lines if l.get("_hidden"))
+    workable_lines = [l for l in lines if not l.get("_hidden") and (l.get("message") or "").strip()]
+    workable = len(workable_lines)
+    translated_workable = sum(1 for l in workable_lines if l.get("is_translated"))
+    polished = sum(1 for l in workable_lines if l.get("_polished"))
+    done_pct = round(100.0 * translated_workable / workable, 1) if workable else 100.0
     files = sorted({l.get("file", "") for l in lines}) if lines else []
     return {
         "projectName": d.get("projectName"),
@@ -136,6 +229,11 @@ def cstl_status(path: str) -> dict:
         "total": total,
         "translated": translated,
         "untranslated": untranslated,
+        "hidden": hidden,
+        "workable": workable,
+        "translated_workable": translated_workable,
+        "polished": polished,
+        "done_pct": done_pct,
         "files": files,
         "imported_files": d.get("imported_files", []),
     }
@@ -147,7 +245,7 @@ def build_minimal_cstl(
     source_lang: str = "Japanese",
     target_lang: str = "Indonesian",
 ) -> dict:
-    from .prompt import PROMPT_HEADERS
+    from .prompt import build_prompt
 
     return ensure_cstl({
         "projectName": name,
@@ -191,7 +289,7 @@ def build_minimal_cstl(
         "imported_files": [],
         "file_order": [],
         "lines": [],
-        "prompt_header": PROMPT_HEADERS["numbered"],
+        "prompt_header": build_prompt("numbered", source_lang, target_lang),
         "ai_translation_format": "numbered",
         "use_dialogue_tags": True,
         "glossary_prompt": "",
@@ -235,7 +333,8 @@ def main(argv=None):
     if a.cmd == "status":
         s = cstl_status(a.cstl_path)
         print(json.dumps(s, ensure_ascii=False, indent=2))
-        print(f"\n{s['translated']}/{s['total']} translated  ({s['untranslated']} remaining)  [{s['projectType']}]")
+        print(f"\n{s['translated_workable']}/{s['workable']} workable translated ({s['done_pct']}%) | "
+              f"{s['translated']}/{s['total']} total ({s['untranslated']} remaining) [{s['projectType']}]")
 
 
 if __name__ == "__main__":

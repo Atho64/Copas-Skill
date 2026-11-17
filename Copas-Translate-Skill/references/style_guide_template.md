@@ -1,48 +1,37 @@
-# STYLE_GUIDE template for cstl-translate
+# STYLE_GUIDE Template for Copas-Translate-Skill
 
-Copy this to `<WORK>/work/STYLE_GUIDE.md` and fill in per-project specifics. All subagents in parallel mode read this file to stay consistent.
+Copy this to `<WORK>/STYLE_GUIDE.md` and lock in project specifics (derived from the user-approved sample batch + saved project prompt). All workers in parallel mode and all review agents read this file.
 
 ---
 
-# Style Guide — {{projectName}}
+# Style Guide — {{projectName}} ({{sourceLang}} -> {{targetLang}})
 
-## Target language & register
+## 1. Target Language, Voice & Pronoun Matrix
+- **Pair profile**: `references/language_pairs.md#{{pairKey}}` (primary default `ja-id`; also `en-id`, `ja-en`).
+- **Narration**: smooth, natural literary prose; avoid translationese (`telah`, `adalah`, passive `di-... oleh`, excessive `yang` chains for Indonesian; stiff calques / tense flips for English).
+- **Dialogue**: natural spoken rhythm matching each character's personality, age, and social distance.
+- **Pronoun policy**: follow the pairwise matrix in `BOOK_BIBLE.md` §2 (never collapse all speakers into one `aku/kamu` or `saya/Anda`; omit pronouns when Indonesian reads naturally without them).
 
-- Target: {{targetLang}} (e.g. Indonesian). Register: natural, neutral-formal for narration, character-faithful for dialogue (casual/polite per speaker).
-- No slang pronouns (lo/lu/gue/gua) unless character explicitly requires it — see Characters below.
+## 2. Quotation, Punctuation & Typography
+- **Dialogue quotes**: choose ONE and keep across all files — standard `"..."` (nested `'...'`) **OR** Japanese `「...」` (`『...』`) if `kagikakko` is enabled. Never double-wrap dialogue that already has a speaker tag.
+- **Narration**: no outer quotes.
+- **Japanese punctuation normalization** (`ja-id` / `ja-en`): `。` → `.`, `、`, → `,`, `！？` → `!?`, fullwidth `\u3000` removed/normalized, `──` / `―` → `—` or `--` consistently, ellipsis `...` or `…` consistently.
+- **CP932 / Shift-JIS patch safety** (when exporting to classic JP engines): stick to ASCII `A–Z a–z 0–9` and avoid accented characters (`é`, `è`, `ü`).
 
-## Quotation & punctuation
+## 3. Character Names, Speakers & Honorifics
+- `glossary.locked.json` (`characters[].render`) is the sole authority.
+- Keep standalone surname, given name, and nickname entries distinct (do not expand a short form like `Mugi` into `Hayakawa Mugi` when the source uses the given name alone).
+- Supply `trans_name` for every line with non-empty source `name`; leave `trans_name: null` for narration. Preserve grouped names (`Nino & Menoa`, `??? & ???`) as one speaker field.
+- **Honorific policy**: state clearly whether `-san/-kun/-chan/-sama/-senpai/-sensei` are kept verbatim or localized (`Kak/Mas/Mbak/Pak/Bu/Guru`).
 
-- Dialogue quotes: **choose one** and keep it — either `"` / `"` + `'` / `'` for nested, or Japanese `「」` / `『』`. Do not mix per-agent.
-- Narration has no outer quotes.
-- Convert Japanese punctuation to target-language equivalents: `。` → `.`, `、`, → `,`, `・` per context, fullwidth `〜` / `ー` normalized.
-- Ellipsis: `…` (one char) or `...` consistently.
+## 4. Terms & Out-of-Glossary Proper Nouns
+- `glossary.locked.json` (`terms[].dst`) is authoritative; `keep_source: true` stays verbatim.
+- Unknown new proper nouns encountered mid-run: follow project policy (keep Hepburn/source by default) and record in `newterms_<N>.txt` / `needs_review`.
 
-## Names (characters)
+## 5. Tags, Placeholders & Line Discipline
+- Preserve verbatim: `<i>`, `<b>`, `{0}`, `%s`, `\n`, `<br>`, `[ruby]`, and meaningful trailing spaces.
+- **1 line in -> 1 line out**: `line_num`, count, and order never change. Never merge, split, or drop lines.
 
-- Glossary `characters[].render` is the only truth. `keep_source:true` or absent → keep source text.
-- If `render` is target-language form, use it everywhere (same person → same rendering).
-- Include `trans_name` for every line where `name` is non-null. Keep honorifics per User Prompt (`-san/-kun/-chan` etc.).
-
-## Terms (non-character)
-
-- Glossary `terms[].dst` is truth; `keep_source:true` → leave untranslated.
-- Do not invent new transliterations for unknown proper nouns — keep source + record for review.
-
-## Tags, placeholders, escapes
-
-- Preserve verbatim: `<i>`, `<b>`, `{0}`, `%s`, `\\n` / `<br>`, `\n`. Do not reposition arbitrarily.
-
-## Line discipline
-
-- **1 line in → 1 line out**. `line_num` unchanged, order unchanged, count unchanged. Never merge/split/drop.
-
-## Tone notes per file/scene (optional)
-
+## 6. Scene / File Tone Notes (Optional)
 - `scene01.json`: ...
 - `scene02.json`: ...
-
-## Dates, numbers, units
-
-- Dates: target-language convention (e.g. `2024年3月5日` → `5 Maret 2024` for Indonesian).
-- Keep numbers as-is unless language requires localization.
