@@ -13,13 +13,22 @@ The two skills chain seamlessly: **Copas-Reverse-Skill** extracts game text into
 
 For existing `.copas`/`.copas.zip` projects, translation, glossary, review, and agent task packets use their matching saved prompts by default (`prompt_header`, `glossary_prompt`, `ai_check_prompt`, `agent_prompt`), resolving `{{sourceLang}}`, `{{targetLang}}`, and `{{lineCount}}` automatically. See [Copas-Translate-Skill](Copas-Translate-Skill/SKILL.md) and [CopasTool workflows](Copas-Translate-Skill/references/copastool_workflows.md).
 
-## Quick-Start Prompt (`.copas` / `.copas.zip`)
+## Quick-Start Prompts (`.copas` / `.copas.zip`)
 
 Localization rules (pronoun/register matrix, native Indonesian SFX/onomatopoeia, anti-translationese, and QA gates) are already built into the skill, so a short starter prompt is enough:
+
+### Full Translation (Start to Finish)
 
 ```text
 Pakai skill Copas-Translate-Skill untuk menerjemahkan "[path/ke/project.copas]" dari awal sampai selesai ([Jepang -> Indonesia], VNDB: "[vXXXX atau judul VN]").
 Ambil cast dari VNDB (`glossary vndb`), siapkan `glossary.locked.json` + `CATATAN_CERITA.md` + `STYLE_GUIDE.md`, kerjakan 1000 baris awal dulu dan tampilkan ringkasan gaya/sapaan + contoh dialognya untuk ACC (Mode A), lalu setelah di-ACC selesaikan sisanya sampai lolos QA (`verify`, `scan`, `audit`), jalankan `polish` (`--stage polish`) dulu lalu Adversarial Review (`review --mode slim`), tampilkan `review_ALL.md` untuk saya `pick` dulu sebelum diekspor ke `.zip` berisi `.copas` saja (`export --format copas-zip`).
+```
+
+### Polishing & QA Only (Already Translated `.copas`)
+
+```text
+Pakai skill Copas-Translate-Skill untuk polishing dan QA saja pada "[path/ke/project.copas]" yang sudah diterjemahkan ([Jepang -> Indonesia], VNDB opsional: "[vXXXX atau judul VN]").
+Ambil glosarium dari proyek (`glossary from-project`, opsional `glossary vndb --merge`) dan buat `CATATAN_CERITA.md` dari terjemahan yang ada (`precedents`), jalankan QA mekanis (`verify`, `scan --mode all`, `audit`, `glossary lint`), lanjutkan `polish` (`--stage polish`) lalu Adversarial Review (`review --mode slim`), tampilkan `review_ALL.md` untuk saya `pick` dulu, verifikasi ulang (`verify`, `audit`), lalu ekspor ke `.zip` berisi `.copas` saja (`export --format copas-zip`).
 ```
 
 Development checks (run inside a skill folder that has `tests/`):
